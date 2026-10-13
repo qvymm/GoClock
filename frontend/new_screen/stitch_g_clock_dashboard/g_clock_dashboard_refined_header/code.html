@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+
+<html lang="vi" style=""><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>GõClock Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet"/>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brandDark: '#0A2619',
+            brandLime: '#B4E61E',
+            brandGreen: '#1A3C2F',
+            brandGray: '#F5F9F7',
+            brandTextGray: '#8A9992',
+          }
+        }
+      }
+    }
+  </script>
+<style data-purpose="custom-styling">
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #0A2619; /* Matches top area */
+    }
+    .status-bar-bg {
+      background-color: #0A2619;
+    }
+    .main-content-area {
+      background: linear-gradient(180deg, #0A2619 0%, #0A2619 30%, #F5F9F7 30%, #F5F9F7 100%);
+    }
+    .custom-shadow {
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+    }
+    .progress-red { background: linear-gradient(90deg, #FF4D4D 0%, #FF4D4D 50%, #E5E7EB 50%); }
+    .progress-green { background: linear-gradient(90deg, #B4E61E 0%, #B4E61E 30%, #E5E7EB 30%); }
+  </style>
+<link data-snapdom="injected-import" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/></head>
+<body class="flex justify-center items-start min-h-screen">
+<!-- BEGIN: Mobile Container -->
+<main class="relative w-full max-w-[375px] min-h-screen bg-brandGray overflow-hidden flex flex-col">
+<!-- BEGIN: Header Section -->
+<header class="bg-brandDark text-white pt-10 pb-12 px-6">
+<!-- Status Bar Area -->
+<div class="flex justify-between items-center mb-4 text-xs font-medium">
+<span class="">02:58</span>
+<div class="flex items-center gap-1">
+<i class="fa-solid fa-signal text-[8px]"></i>
+<div class="w-4 h-2 border border-white/40 rounded-sm relative">
+<div class="absolute inset-y-0 left-0 bg-white w-2/3"></div>
+</div>
+</div>
+</div>
+<!-- User Greeting Area -->
+<div class="flex justify-between items-center"><div class="flex items-center gap-3"> <div class="w-10 h-10 rounded-full border border-white/20 overflow-hidden"> <img alt="Avatar" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDz9tZ-omASPlAfc7fzzm5UfPx0gg1gDpdl2m9seg1R9pWuy_XnCY36M3IYqehxkFvFL2PnOBDfSGI5ZTzEPvEXFEuHbrbJKFbsOBjzs93G9Hj2TjqyomKoRqpK7z_ogT_iaN-hrDpyjbrRazz2ISP1SYFxqIW8Bd8Av8EvJDiDXfHGZXrGTe2_zHoVHdK9Lxv6pZo7SvMaiwyy9CQhfN526Aq8r-Hv6UibOCe-nZ9b_JZEER9U0Jw69LMt2MePR4vFpKxjH2EZhW8"/> </div> <div> <p class="text-xs text-gray-400">Chào buổi sáng,</p> <h1 class="text-2xl font-bold">Bạn</h1> </div> </div> <div class="flex gap-3"> <div class="relative w-10 h-10 bg-white/5 rounded-full flex items-center justify-center border border-white/10"> <i class="fa-regular fa-bell text-lg"></i> <span class="absolute top-0 right-0 bg-red-500 text-[10px] w-4 h-4 flex items-center justify-center rounded-full border-2 border-brandDark">3</span> </div> <div class="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center border border-white/10"> <i class="fa-solid fa-chart-simple text-brandLime"></i> </div> </div></div>
+<!-- Summary Stats Row -->
+</header><section class="bg-brandGray rounded-t-[40px] px-6 pt-8 pb-24 -mt-8 z-10 flex-1 overflow-y-auto">
+<!-- BEGIN: Today's Focus Card -->
+<!-- BEGIN: TodayTaskSummary -->
+<section class="bg-[#1a2e1a] rounded-[2rem] p-6 text-white shadow-sm mb-4" data-purpose="task-summary-card">
+<h2 class="text-xs font-semibold tracking-wider text-gray-400 uppercase mb-3">Hôm nay</h2>
+<div class="flex items-baseline gap-2 mb-4">
+<span class="text-3xl font-bold text-[#c6f021]">1/3</span>
+<span class="text-lg text-gray-300">nhiệm vụ hoàn thành</span>
+</div>
+<!-- Progress Bar -->
+<div class="w-full bg-[#2a3d2a] h-2 rounded-full overflow-hidden">
+<div class="bg-[#c6f021] h-full w-1/3 rounded-full"></div>
+</div>
+</section>
+<!-- END: TodayTaskSummary -->
+<!-- BEGIN: StatsRow -->
+<div class="grid grid-cols-2 gap-4 mb-4" data-purpose="stats-grid">
+<!-- Calorie Widget -->
+<section class="bg-white rounded-[1.5rem] p-5 shadow-sm border border-gray-100 flex flex-col items-center" data-purpose="calorie-widget">
+<div class="w-full flex items-center gap-1 mb-4">
+<svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.5-7 3 10 3 6 6.5 6 3 10 3 6 6.5 6 3 10 3 6 6.5 6 3 10 3 6 6.5 6 3 10 3 6 6.5 6 3 10 3 6 6.5 6 3 10 3 6 6.5 6z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+<span class="text-[10px] font-bold text-gray-400 uppercase">Calo</span>
+</div>
+<!-- Circular Progress Chart -->
+<div class="progress-ring-container mb-4 relative w-[80px] h-[80px]">
+<svg height="80" width="80">
+<circle class="fill-transparent stroke-gray-100 stroke-[8]" cx="40" cy="40" r="36"></circle>
+<circle class="fill-transparent stroke-[#8b1e1e] stroke-[8]" cx="40" cy="40" r="36" style="stroke-dasharray: 226; stroke-dashoffset: 131; stroke-linecap: round; transform: rotate(-90deg); transform-origin: 50% 50%;"></circle>
+</svg>
+<div class="absolute inset-0 flex items-center justify-center">
+<span class="text-sm font-bold text-gray-800">42%</span>
+</div>
+</div>
+<p class="text-xs font-bold text-gray-500">
+<span class="text-gray-800">830</span>/2000 kcal
+        </p>
+</section>
+<!-- Sleep Widget -->
+<section class="bg-white rounded-[1.5rem] p-5 shadow-sm border border-gray-100 flex flex-col items-center" data-purpose="sleep-widget">
+<div class="w-full flex items-center gap-1 mb-6">
+<svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+<span class="text-[10px] font-bold text-gray-400 uppercase">Hôm qua</span>
+</div>
+<div class="text-center mb-2">
+<span class="text-3xl font-bold text-gray-800">6.5h</span>
+</div>
+<div class="bg-[#bda864] bg-opacity-80 px-4 py-1 rounded-full">
+<span class="text-[10px] font-bold text-white">Trung bình</span>
+</div>
+</section>
+</div>
+<!-- END: StatsRow -->
+<!-- BEGIN: CountdownCard -->
+<section class="bg-[#c6f021] rounded-[1.5rem] p-6 shadow-sm flex justify-between items-center mb-6" data-purpose="countdown-card">
+<div class="flex flex-col gap-1">
+<h3 class="text-[10px] font-bold text-[#4a5a12] uppercase opacity-70">Đếm ngược</h3>
+<p class="text-lg font-bold text-[#1a2e1a]">Nộp bài tập Toán</p>
+</div>
+<div class="text-2xl font-bold text-[#1a2e1a]" style='font-family: "JetBrains Mono", monospace;'>
+        00:59:03
+      </div>
+</section>
+<!-- END: CountdownCard -->
+<!-- END: Today's Focus Card -->
+<!-- BEGIN: Task List Section -->
+<section data-purpose="task-list">
+<div class="flex justify-between items-center mb-4">
+<h2 class="font-bold text-brandDark">Nhiệm vụ hôm nay</h2>
+<a class="text-brandLime text-xs font-semibold flex items-center gap-1" href="#">
+            Xem tất cả <i class="fa-solid fa-chevron-right text-[8px]"></i>
+</a>
+</div>
+<!-- Task Items -->
+<div class="space-y-4">
+<!-- Task 1 -->
+<div class="flex items-start gap-3">
+<span class="text-[10px] text-gray-500 mt-4 w-8">04:46</span>
+<div class="flex-1 bg-white rounded-2xl p-4 custom-shadow relative overflow-hidden">
+<div class="flex justify-between items-start mb-2">
+<div class="flex items-center gap-3">
+<div class="w-5 h-5 rounded-full border-2 border-gray-300"></div>
+<h4 class="font-bold text-sm text-brandDark">Nộp báo cáo EXE101</h4>
+</div>
+<i class="fa-solid fa-chevron-right text-gray-300 text-xs mt-1"></i>
+</div>
+<div class="flex gap-2 mb-3 ml-8">
+<span class="bg-red-50 text-red-500 text-[9px] px-2 py-0.5 rounded-full font-medium">Deadline</span>
+<span class="bg-red-50 text-red-500 text-[9px] px-2 py-0.5 rounded-full font-medium">Sắp hết hạn</span>
+</div>
+<div class="ml-8 h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+<div class="h-full bg-red-500 w-1/2"></div>
+</div>
+</div>
+</div>
+<!-- Task 2 -->
+<div class="flex items-start gap-3">
+<span class="text-[10px] text-gray-500 mt-4 w-8">07:46</span>
+<div class="flex-1 bg-white rounded-2xl p-4 custom-shadow relative">
+<div class="flex justify-between items-start mb-2">
+<div class="flex items-center gap-3">
+<div class="w-5 h-5 rounded-full border-2 border-gray-300"></div>
+<h4 class="font-bold text-sm text-brandDark">Học React + TypeScript</h4>
+</div>
+<i class="fa-solid fa-chevron-right text-gray-300 text-xs mt-1"></i>
+</div>
+<div class="flex gap-2 mb-3 ml-8">
+<span class="bg-blue-50 text-blue-500 text-[9px] px-2 py-0.5 rounded-full font-medium">Học tập</span>
+</div>
+<div class="ml-8 h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+<div class="h-full bg-brandDark w-1/4"></div>
+</div>
+</div>
+</div>
+<!-- Task 3 (Completed) -->
+<div class="flex items-start gap-3 opacity-60">
+<span class="text-[10px] text-gray-500 mt-4 w-8">01:46</span>
+<div class="flex-1 bg-white rounded-2xl p-4 custom-shadow">
+<div class="flex justify-between items-start mb-2">
+<div class="flex items-center gap-3">
+<i class="fa-solid fa-circle-check text-brandLime text-lg"></i>
+<h4 class="font-bold text-sm text-brandDark line-through">Họp nhóm dự án GõClock</h4>
+</div>
+<i class="fa-solid fa-chevron-right text-gray-300 text-xs mt-1"></i>
+</div>
+<div class="flex gap-2 ml-8">
+<span class="bg-green-50 text-green-600 text-[9px] px-2 py-0.5 rounded-full font-medium">Nhóm</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- END: Task List Section -->
+</section>
+<!-- END: Header Section -->
+<!-- BEGIN: Main Content Body -->
+<!-- END: Main Content Body -->
+<!-- BEGIN: Floating Action Button -->
+<button aria-label="Thêm mới" class="fixed bottom-24 right-6 w-14 h-14 bg-brandLime rounded-full shadow-lg shadow-brandLime/30 flex items-center justify-center text-brandDark z-30">
+<i class="fa-solid fa-plus text-2xl"></i>
+</button>
+<!-- END: Floating Action Button -->
+<!-- BEGIN: Bottom Navigation -->
+<nav class="fixed bottom-0 left-0 right-0 bg-brandDark border-t border-white/5 px-6 pt-3 pb-8 flex justify-between items-center z-40 max-w-[375px] mx-auto" data-purpose="bottom-nav">
+<a class="flex flex-col items-center gap-1 group" href="#">
+<div class="bg-brandGreen w-10 h-10 rounded-xl flex items-center justify-center text-brandLime">
+<i class="fa-solid fa-house"></i>
+</div>
+<span class="text-brandLime text-[10px] font-medium">Home</span>
+</a>
+<a class="flex flex-col items-center gap-1 group text-brandTextGray" href="#">
+<div class="w-10 h-10 flex items-center justify-center">
+<i class="fa-regular fa-calendar-days text-lg"></i>
+</div>
+<span class="text-[10px]">Lịch</span>
+</a>
+<a class="flex flex-col items-center gap-1 group text-brandTextGray" href="#">
+<div class="w-10 h-10 flex items-center justify-center">
+<i class="fa-solid fa-utensils text-lg"></i>
+</div>
+<span class="text-[10px]">Dinh dưỡng</span>
+</a>
+<a class="flex flex-col items-center gap-1 group text-brandTextGray" href="#">
+<div class="w-10 h-10 flex items-center justify-center">
+<i class="fa-regular fa-moon text-lg"></i>
+</div>
+<span class="text-[10px]">Giấc ngủ</span>
+</a>
+<a class="flex flex-col items-center gap-1 group text-brandTextGray" href="#">
+<div class="w-10 h-10 flex items-center justify-center">
+<i class="fa-regular fa-user text-lg"></i>
+</div>
+<span class="text-[10px]">Hồ sơ</span>
+</a>
+<!-- iOS Home Indicator simulation -->
+<div class="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-32 h-1 bg-white/20 rounded-full"></div>
+</nav>
+<!-- END: Bottom Navigation -->
+</main>
+<!-- END: Mobile Container -->
+</body></html>

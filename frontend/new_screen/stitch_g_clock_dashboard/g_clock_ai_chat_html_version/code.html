@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <title>Hỏi AI GõClock</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <!-- Tailwind Configuration -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'goclock-dark': '#1A3020', // Dark Green based on image
+            'goclock-lime': '#D4F03D', // Lime Yellow based on image
+            'chat-bg': '#E9EFEC',      // Background color for chat area
+            'bubble-ai': '#263D2E',   // Darker green for AI bubbles
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Google Fonts for better typography -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+  <style data-purpose="typography">
+    body {
+      font-family: 'Inter', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+  </style>
+  <style data-purpose="layout-adjustments">
+    /* Custom scrollbar for chat area */
+    .chat-scroll::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .chat-scroll::-webkit-scrollbar-thumb {
+      background-color: rgba(0, 0, 0, 0.1);
+      border-radius: 10px;
+    }
+
+    /* Fixing the bottom safe area for modern mobile browsers */
+    .safe-bottom {
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+  </style>
+</head>
+
+<body class="bg-goclock-dark text-white flex flex-col h-screen overflow-hidden">
+  <!-- BEGIN: Header -->
+  <header class="flex items-center px-4 pt-4 pb-6" data-purpose="app-header">
+    <button aria-label="Go back" class="p-2">
+      <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M10 19l-7-7m0 0l7-7m-7 7h18" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+      </svg>
+    </button>
+    <h1 class="flex-1 text-center text-lg font-semibold mr-8">Hỏi AI GõClock</h1>
+  </header>
+  <!-- END: Header -->
+  <!-- BEGIN: Greeting Section -->
+  <section class="px-6 pb-6" data-purpose="welcome-message">
+    <h2 class="text-2xl font-bold leading-tight">
+      Chào buổi sáng, tôi có thể<br>giúp gì cho bạn?
+    </h2>
+  </section>
+  <!-- END: Greeting Section -->
+  <!-- BEGIN: Main Chat Container -->
+  <main class="flex-1 bg-chat-bg rounded-t-[40px] flex flex-col overflow-hidden text-black"
+    data-purpose="chat-interface">
+    <!-- Suggested Prompts -->
+    <div class="px-4 pt-6 pb-2 overflow-x-auto no-scrollbar flex space-x-2 shrink-0" data-purpose="quick-replies">
+      <button
+        class="whitespace-nowrap px-4 py-2 bg-transparent border-2 border-goclock-dark rounded-full text-sm font-semibold text-goclock-dark hover:bg-goclock-dark/10 transition-colors">
+        Lên lịch học cho tôi
+      </button>
+      <button
+        class="whitespace-nowrap px-4 py-2 bg-transparent border-2 border-goclock-dark rounded-full text-sm font-semibold text-goclock-dark hover:bg-goclock-dark/10 transition-colors">
+        Phân tích calo hôm nay
+      </button>
+    </div>
+    <div class="px-4 pb-4 overflow-x-auto no-scrollbar shrink-0">
+      <button
+        class="whitespace-nowrap px-4 py-2 bg-transparent border-2 border-goclock-dark rounded-full text-sm font-semibold text-goclock-dark hover:bg-goclock-dark/10 transition-colors">
+        Tìm kiếm tài liệu cho EXE101
+      </button>
+    </div>
+    <!-- Scrollable Chat History -->
+    <div class="flex-1 overflow-y-auto px-4 py-4 chat-scroll space-y-4" data-purpose="chat-history">
+      <!-- User Message -->
+      <div class="flex justify-end">
+        <div class="max-w-[80%] bg-goclock-lime p-4 rounded-2xl rounded-tr-none shadow-sm">
+          <p class="text-sm font-medium">Bạn lên lịch học cho tôi</p>
+        </div>
+      </div>
+      <!-- AI Message -->
+      <div class="flex justify-start">
+        <div class="max-w-[85%] bg-bubble-ai text-white p-4 rounded-2xl rounded-tl-none shadow-sm">
+          <p class="text-sm leading-relaxed">
+            Cho lát ngày gì bản anh thương lực hợp ngạt hôm nay, thitì tiếng thời, tthı nám-rớt các nhà kiếm tài liệu
+            cên tích phân trình những vụ giúp học diện sẽ được thóa tôi pha bồm nào.
+          </p>
+        </div>
+      </div>
+      <!-- User Message -->
+      <div class="flex justify-end">
+        <div class="max-w-[80%] bg-goclock-lime p-4 rounded-2xl rounded-tr-none shadow-sm">
+          <p class="text-sm font-medium">Lên lịch học đó thành, và cho tôi, học giúp thêm tủn nho EXE101</p>
+        </div>
+      </div>
+      <!-- AI Message -->
+      <div class="flex justify-start">
+        <div class="max-w-[85%] bg-bubble-ai text-white p-4 rounded-2xl rounded-tl-none shadow-sm">
+          <p class="text-sm leading-relaxed">
+            Tôi tôi, ngay sáng, tôi buổi giúp thân hôn kiếm tài liệu cho EXE101.
+          </p>
+        </div>
+      </div>
+    </div>
+    <!-- BEGIN: Input Area -->
+    <div class="p-4 bg-chat-bg safe-bottom" data-purpose="input-container">
+      <div class="flex items-center space-x-3">
+        <!-- Text Input with Mic -->
+        <div class="flex-1 bg-white rounded-full flex items-center px-4 py-2 shadow-sm border border-gray-200">
+          <button aria-label="Voice Input" class="text-gray-600 p-1">
+          </button>
+          <input class="flex-1 bg-transparent border-none focus:ring-0 text-base py-2 px-2 placeholder-gray-400"
+            placeholder="Hỏi AI..." type="text">
+        </div>
+        <!-- Send Button -->
+        <button aria-label="Send Message"
+          class="w-14 h-14 bg-goclock-lime rounded-full flex items-center justify-center shadow-md active:scale-95 transition-transform">
+          <svg class="h-7 w-7 text-goclock-dark" fill="currentColor" viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg">
+            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
+          </svg>
+        </button>
+      </div>
+    </div>
+    <!-- END: Input Area -->
+  </main>
+  <!-- END: Main Chat Container -->
+  <script data-purpose="interaction-logic">
+    // Simple logic to scroll to bottom of chat on load
+    window.onload = () => {
+      const chatHistory = document.querySelector('[data-purpose="chat-history"]');
+      chatHistory.scrollTop = chatHistory.scrollHeight;
+    };
+
+    // Optional: Prevent body scroll on mobile
+    document.body.addEventListener('touchmove', function (e) {
+      if (e.target.closest('[data-purpose="chat-history"]')) return;
+      e.preventDefault();
+    }, { passive: false });
+  </script>
+</body>
+
+</html>

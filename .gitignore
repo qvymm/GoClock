@@ -1,0 +1,19 @@
+# Dependency directories
+node_modules/
+
+# Local env files
+.env
+.env.local
+.env.*.local
+
+# Vercel & IDEs
+.vercel
+.vscode/
+.idea/
+.bolt/
+dist/
+build/
+.expo/
+*.log
+
+.vercel

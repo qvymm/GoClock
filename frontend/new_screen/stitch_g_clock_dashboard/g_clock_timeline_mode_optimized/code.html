@@ -1,0 +1,179 @@
+<!DOCTYPE html><html lang="vi" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>GõClock - Timeline View</title>
+<!-- Tailwind CSS CDN -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Google Fonts: Inter -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'go-dark-green': '#0B2113',
+            'go-lime-yellow': '#CFFB2B',
+            'go-light-bg': '#F3F7F2',
+            'go-card-bg': '#FFFFFF',
+            'go-accent-red': '#FF4D4D',
+            'go-accent-blue': '#E1F0FF',
+            'go-text-blue': '#4A90E2',
+            'go-tag-deadline': '#FFE5E5',
+            'go-tag-expiry': '#FFF4E5',
+            'go-tag-green': '#E8F5E9',
+          },
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+        }
+      }
+    }
+  </script>
+<style data-purpose="custom-layout">
+    body {
+      background-color: #0B2113;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    .safe-top {
+      padding-top: env(safe-area-inset-top);
+    }
+    .safe-bottom {
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    /* Timeline Grid Styling */
+    .timeline-grid {
+      background-image: linear-gradient(#e5e7eb 1px, transparent 1px);
+      background-size: 100% 60px; /* 1 hour blocks */
+    }
+    .timeline-subgrid {
+      background-image: linear-gradient(#f3f4f6 1px, transparent 1px);
+      background-size: 100% 15px; /* 15 min increments */
+    }
+    .time-block {
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+      cursor: grab;
+    }
+    .time-block:active {
+      cursor: grabbing;
+    }
+  </style>
+</head>
+<body class="flex flex-col h-screen text-white overflow-hidden">
+<!-- BEGIN: Header Section -->
+<header class="safe-top bg-go-dark-green px-6 pt-6 pb-2" data-purpose="main-header">
+<div class="flex justify-between items-center mb-1">
+<div class="flex items-center gap-2">
+<h1 class="text-3xl font-bold">Lịch học</h1>
+</div>
+<button class="bg-go-dark-green border border-go-lime-yellow/30 text-go-lime-yellow px-4 py-1.5 rounded-xl flex items-center gap-1 text-sm font-medium hover:bg-go-lime-yellow hover:text-go-dark-green transition-colors">
+<span class="text-xl">+</span> Thêm
+    </button>
+</div>
+<p class="text-gray-400 text-sm">Thứ Tư, 24 tháng 6, 2026</p>
+</header>
+<!-- BEGIN: Calendar Slider -->
+<section class="bg-go-dark-green px-4 pb-4" data-purpose="calendar-slider">
+<div class="flex items-center justify-between gap-2 overflow-x-auto no-scrollbar py-2"><div class="flex flex-col items-center bg-white/5 rounded-2xl p-2 min-w-[45px] border-2 border-red-500"><span class="text-[10px] text-gray-400 mb-1">T2</span><span class="text-lg font-bold">22</span></div><div class="flex flex-col items-center bg-white/5 rounded-2xl p-2 min-w-[45px] border border-white/10"><span class="text-[10px] text-gray-400 mb-1">T3</span><span class="text-lg font-bold">23</span></div><div class="flex flex-col items-center bg-go-lime-yellow rounded-2xl p-2 min-w-[45px] text-go-dark-green relative border-2 border-red-500"><span class="text-[10px] font-semibold mb-1">T4</span><span class="text-lg font-extrabold">24</span><div class="absolute bottom-1 w-1 h-1 bg-go-dark-green rounded-full"></div></div><div class="flex flex-col items-center bg-white/5 rounded-2xl p-2 min-w-[45px] border-2 border-red-500"><span class="text-[10px] text-gray-400 mb-1">T5</span><span class="text-lg font-bold">25</span></div><div class="flex flex-col items-center bg-white/5 rounded-2xl p-2 min-w-[45px] border border-white/10"><span class="text-[10px] text-gray-400 mb-1">T6</span><span class="text-lg font-bold">26</span></div><div class="flex flex-col items-center bg-white/5 rounded-2xl p-2 min-w-[45px] border border-white/10"><span class="text-[10px] text-gray-400 mb-1">T7</span><span class="text-lg font-bold">27</span></div><div class="flex flex-col items-center bg-white/5 rounded-2xl p-2 min-w-[45px] border border-white/10"><span class="text-[10px] text-gray-400 mb-1">CN</span><span class="text-lg font-bold">28</span></div></div>
+<!-- Toggle Switch (List vs Timeline) -->
+<div class="mt-4 flex bg-white/10 p-1 rounded-2xl max-w-[240px] mx-auto">
+<button class="flex-1 text-[11px] py-1.5 rounded-xl text-gray-400 font-bold">DANH SÁCH</button>
+<button class="flex-1 text-[11px] py-1.5 rounded-xl bg-go-lime-yellow text-go-dark-green font-bold">DÒNG THỜI GIAN</button>
+</div>
+</section>
+<!-- Main Container -->
+<main class="flex-1 bg-go-light-bg rounded-t-[40px] flex flex-col overflow-hidden pt-0" data-purpose="timeline-container">
+<!-- All-day Section (Pinned) -->
+<!-- Vertical Timeline Grid -->
+<div class="flex-1 overflow-y-auto no-scrollbar relative">
+<div class="flex min-h-full">
+<!-- Time Axis -->
+<div class="w-16 flex-shrink-0 pt-[15px] pb-20">
+<!-- 00:00 to 24:00 labels -->
+<div class="h-[60px] flex justify-center text-[11px] font-bold text-gray-400">07:00</div>
+<div class="h-[60px] flex justify-center text-[11px] font-bold text-gray-400">08:00</div>
+<div class="h-[60px] flex justify-center text-[11px] font-bold text-gray-400">09:00</div>
+<div class="h-[60px] flex justify-center text-[11px] font-bold text-gray-400">10:00</div>
+<div class="h-[60px] flex justify-center text-[11px] font-bold text-gray-400">11:00</div>
+<div class="h-[60px] flex justify-center text-[11px] font-bold text-gray-400">12:00</div>
+<div class="h-[60px] flex justify-center text-[11px] font-bold text-gray-400">13:00</div>
+<div class="h-[60px] flex justify-center text-[11px] font-bold text-gray-400">14:00</div>
+</div>
+<!-- Grid Content Area -->
+<div class="flex-1 relative border-l border-gray-200 timeline-grid timeline-subgrid pt-[15px] pr-4 pb-20">
+<!-- Quick Add Hint (Double tap feel) -->
+<div class="absolute top-[30px] left-2 right-2 h-[30px] border-2 border-dashed border-gray-200 rounded-xl flex items-center justify-center opacity-40">
+<span class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">+ Chạm 2 lần để thêm</span>
+</div>
+<!-- Block: Class Event (Solid Green) -->
+<div class="absolute top-[60px] left-2 right-2 h-[120px] bg-green-800 text-white rounded-2xl p-3 time-block z-10 flex flex-col border border-white/10" style="top: 60px; height: 120px;">
+<div class="flex justify-between items-start">
+<span class="text-xs font-bold leading-tight">Học React + TypeScript</span>
+<div class="flex flex-col items-end gap-1">
+<span class="text-[10px] font-medium opacity-80">08:00 - 10:00</span>
+<div class="bg-white/20 p-1 rounded-md">
+<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</div>
+</div>
+</div>
+<div class="mt-auto flex justify-center">
+<div class="w-8 h-1 bg-white/30 rounded-full"></div> <!-- Drag Handle bottom -->
+</div>
+</div>
+<!-- Block: Task (Outlined) -->
+<div class="absolute top-[210px] left-2 right-2 h-[45px] bg-white border-2 border-go-text-blue/30 rounded-2xl p-3 time-block z-10 flex items-center gap-3" style="top: 210px;">
+<div class="w-4 h-4 rounded-full border-2 border-go-text-blue flex-shrink-0"></div>
+<span class="text-xs font-bold text-go-dark-green truncate">Ôn tập Toán rời rạc</span>
+<span class="ml-auto text-[9px] font-bold text-gray-400">10:30</span>
+<div class="absolute bottom-1 left-1/2 -translate-x-1/2 w-6 h-0.5 bg-gray-200 rounded-full"></div>
+</div>
+<!-- Block: Group Meeting (Faded/Completed) -->
+<div class="absolute top-[300px] left-2 right-2 h-[60px] bg-gray-100 border border-gray-200 rounded-2xl p-3 z-0 flex items-center gap-3 opacity-60" style="top: 300px;">
+<div class="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+<svg class="h-2 w-2 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"></path></svg>
+</div>
+<span class="text-xs font-bold text-gray-500 line-through">Họp nhóm dự án GõClock</span>
+<span class="ml-auto text-[9px] font-bold text-gray-400">12:00</span>
+</div>
+<!-- Current Time Indicator -->
+<div class="absolute left-0 right-0 border-t-2 border-red-500 flex items-center z-20" style="top: 145px;">
+<div class="w-2 h-2 bg-red-500 rounded-full -ml-1"></div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- BEGIN: Bottom Navigation -->
+<nav class="fixed bottom-0 left-0 right-0 bg-go-dark-green border-t border-white/5 safe-bottom flex justify-around items-center py-3 px-4 z-50" data-purpose="bottom-nav">
+<div class="flex flex-col items-center gap-1">
+<svg class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path></svg>
+<span class="text-[10px] text-gray-400">Home</span>
+</div>
+<div class="flex flex-col items-center gap-1 bg-white/5 rounded-2xl px-4 py-1">
+<svg class="h-6 w-6 text-go-lime-yellow" fill="currentColor" viewBox="0 0 24 24"><path clip-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" fill-rule="evenodd"></path></svg>
+<span class="text-[10px] text-go-lime-yellow font-bold">Lịch</span>
+</div>
+<div class="flex flex-col items-center gap-1">
+<svg class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path></svg>
+<span class="text-[10px] text-gray-400">Dinh dưỡng</span>
+</div>
+<div class="flex flex-col items-center gap-1">
+<svg class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path></svg>
+<span class="text-[10px] text-gray-400">Giấc ngủ</span>
+</div>
+<div class="flex flex-col items-center gap-1">
+<svg class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path></svg>
+<span class="text-[10px] text-gray-400">Hồ sơ</span>
+</div>
+</nav>
+<!-- iOS Indicator -->
+<div class="fixed bottom-1 left-1/2 -translate-x-1/2 w-32 h-1.5 bg-gray-600/30 rounded-full z-50"></div>
+
+
+</body></html>

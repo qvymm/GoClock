@@ -1,0 +1,224 @@
+<!DOCTYPE html><html lang="vi" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>GõClock - Lịch học</title>
+<!-- Tailwind CSS CDN -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Google Fonts: Inter or similar for modern look -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'go-dark-green': '#0B2113',
+            'go-lime-yellow': '#CFFB2B',
+            'go-light-bg': '#F3F7F2',
+            'go-card-bg': '#FFFFFF',
+            'go-accent-red': '#FF4D4D',
+            'go-accent-blue': '#E1F0FF',
+            'go-text-blue': '#4A90E2',
+            'go-tag-deadline': '#FFE5E5',
+            'go-tag-expiry': '#FFF4E5',
+            'go-tag-green': '#E8F5E9',
+          },
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+        }
+      }
+    }
+  </script>
+<style data-purpose="custom-layout">
+    body {
+      background-color: #0B2113; /* Match top part */
+      -webkit-tap-highlight-color: transparent;
+    }
+    /* Hide scrollbar for horizontal calendar */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    /* Safe area padding for mobile notches */
+    .safe-top {
+      padding-top: env(safe-area-inset-top);
+    }
+    .safe-bottom {
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+  </style>
+</head>
+<body class="flex flex-col min-h-screen text-white overflow-hidden">
+<!-- BEGIN: Header Section -->
+<header class="safe-top bg-go-dark-green px-6 pt-6 pb-4" data-purpose="main-header"><div class="flex justify-between items-center mb-1">
+<div class="flex items-center gap-2">
+<h1 class="text-3xl font-bold">Lịch học</h1>
+</div>
+<button class="bg-go-dark-green border border-go-lime-yellow/30 text-go-lime-yellow px-4 py-1.5 rounded-xl flex items-center gap-1 text-sm font-medium hover:bg-go-lime-yellow hover:text-go-dark-green transition-colors">
+<span class="text-xl">+</span> Thêm
+    </button>
+</div>
+<p class="text-gray-400 text-sm">Thứ Tư, 24 tháng 6, 2026</p></header>
+<!-- END: Header Section -->
+<!-- BEGIN: Calendar Slider -->
+<section class="bg-go-dark-green px-4 pb-8" data-purpose="calendar-slider"><div class="grid grid-cols-7 gap-1 py-2"><div class="flex flex-col items-center bg-white/5 rounded-2xl border-2 border-red-500 px-1 py-2"><span class="text-[10px] text-gray-400 mb-1">T2</span><span class="text-lg font-bold">22</span></div><div class="flex flex-col items-center bg-white/5 rounded-2xl border border-white/10 px-1 py-2"><span class="text-[10px] text-gray-400 mb-1">T3</span><span class="text-lg font-bold">23</span></div><div class="flex flex-col items-center bg-go-lime-yellow rounded-2xl text-go-dark-green relative border-2 border-red-500 px-1 py-2"><span class="text-[10px] font-semibold mb-1">T4</span><span class="text-lg font-extrabold">24</span><div class="absolute bottom-1 w-1 h-1 bg-go-dark-green rounded-full"></div></div><div class="flex flex-col items-center bg-white/5 rounded-2xl border-2 border-red-500 px-1 py-2"><span class="text-[10px] text-gray-400 mb-1">T5</span><span class="text-lg font-bold">25</span></div><div class="flex flex-col items-center bg-white/5 rounded-2xl border border-white/10 px-1 py-2"><span class="text-[10px] text-gray-400 mb-1">T6</span><span class="text-lg font-bold">26</span></div><div class="flex flex-col items-center bg-white/5 rounded-2xl border border-white/10 px-1 py-2"><span class="text-[10px] text-gray-400 mb-1">T7</span><span class="text-lg font-bold">27</span></div><div class="flex flex-col items-center bg-white/5 rounded-2xl border border-white/10 px-1 py-2"><span class="text-[10px] text-gray-400 mb-1">CN</span><span class="text-lg font-bold">28</span></div></div>
+<!-- Toggle Switch (List vs Timeline) -->
+<div class="mt-4 flex bg-white/10 p-1 rounded-2xl max-w-[240px] mx-auto">
+<button class="flex-1 text-[11px] py-1.5 rounded-xl bg-go-lime-yellow text-go-dark-green font-bold">DANH SÁCH</button>
+<button class="flex-1 text-[11px] py-1.5 rounded-xl text-gray-400 font-bold">DÒNG THỜI GIAN</button>
+</div></section>
+<!-- END: Calendar Slider -->
+<!-- BEGIN: Task List Main Area -->
+<main class="flex-1 bg-go-light-bg rounded-t-[40px] px-6 pt-8 pb-20 overflow-y-auto" data-purpose="task-list-container">
+<!-- Task Card 1: Deadline -->
+<div class="bg-go-card-bg rounded-3xl p-5 mb-4 shadow-sm border border-gray-100 relative overflow-hidden" data-purpose="task-card">
+<div class="flex items-start gap-4">
+<div class="w-6 h-6 rounded-full border-2 border-gray-300 mt-1 flex-shrink-0"></div>
+<div class="flex-1">
+<h3 class="text-go-dark-green font-bold text-lg leading-tight">Nộp báo cáo EXE101</h3>
+<div class="flex gap-2 mt-2">
+<span class="bg-go-tag-deadline text-[#FF7070] text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">Deadline</span>
+<span class="bg-go-tag-expiry text-[#FFA84A] text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">Sắp hết hạn</span>
+</div>
+<div class="flex items-center justify-between mt-4">
+<div class="flex items-center text-gray-400 text-xs gap-1">
+<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+<path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+              05:14
+            </div>
+<span class="text-go-accent-red font-mono font-bold">01:01:00</span>
+</div>
+</div>
+</div>
+<!-- Red Progress Bar -->
+<div class="absolute bottom-0 left-0 h-1.5 bg-go-accent-red w-[80%] rounded-tr-full"></div>
+<div class="absolute bottom-0 left-0 h-1.5 bg-gray-100 w-full -z-10"></div>
+</div>
+<!-- Task Card 2: Learning -->
+<div class="bg-go-card-bg rounded-3xl p-5 mb-4 shadow-sm border border-gray-100 relative overflow-hidden" data-purpose="task-card">
+<div class="flex items-start gap-4">
+<div class="w-6 h-6 rounded-full border-2 border-gray-300 mt-1 flex-shrink-0"></div>
+<div class="flex-1">
+<h3 class="text-go-dark-green font-bold text-lg leading-tight">Học React + TypeScript</h3>
+<div class="flex gap-2 mt-2">
+<span class="bg-go-accent-blue text-go-text-blue text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">Học tập</span>
+</div>
+<div class="flex items-center justify-between mt-4">
+<div class="flex items-center text-gray-400 text-xs gap-1">
+<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+<path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+              08:14
+            </div>
+<span class="text-go-dark-green font-mono font-bold">04:01:00</span>
+</div>
+</div>
+</div>
+<!-- Green Progress Bar -->
+<div class="absolute bottom-0 left-0 h-1.5 bg-green-800 w-[30%] rounded-tr-full"></div>
+<div class="absolute bottom-0 left-0 h-1.5 bg-gray-100 w-full -z-10"></div>
+</div>
+<!-- Task Card 3: Group Meeting (Completed) -->
+<div class="bg-go-card-bg rounded-3xl p-5 mb-4 shadow-sm border border-gray-100 opacity-60" data-purpose="task-card-completed">
+<div class="flex items-start gap-4">
+<div class="w-6 h-6 rounded-full bg-green-100 border border-green-500 mt-1 flex-shrink-0 flex items-center justify-center">
+<svg class="h-4 w-4 text-green-600" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+<path clip-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" fill-rule="evenodd"></path>
+</svg>
+</div>
+<div class="flex-1">
+<h3 class="text-gray-400 font-bold text-lg leading-tight line-through">Họp nhóm dự án GõClock</h3>
+<div class="flex gap-2 mt-2">
+<span class="bg-go-tag-green text-green-700 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">Nhóm</span>
+</div>
+<div class="flex items-center mt-4">
+<div class="flex items-center text-gray-400 text-xs gap-1">
+<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+<path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+              02:14
+            </div>
+</div>
+</div>
+</div>
+</div>
+<!-- Task Card 4: Daily Review -->
+<div class="bg-go-card-bg rounded-3xl p-5 mb-4 shadow-sm border border-gray-100 relative overflow-hidden" data-purpose="task-card">
+<div class="flex items-start gap-4">
+<div class="w-6 h-6 rounded-full border-2 border-gray-300 mt-1 flex-shrink-0"></div>
+<div class="flex-1">
+<h3 class="text-go-dark-green font-bold text-lg leading-tight">Ôn tập Toán rời rạc</h3>
+<div class="flex gap-2 mt-2">
+<span class="bg-go-accent-blue text-go-text-blue text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">Học tập</span>
+<span class="bg-gray-100 text-gray-500 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase flex items-center gap-1">
+<svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+<path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+              Hằng ngày
+            </span>
+</div>
+<div class="flex items-center justify-between mt-4">
+<div class="flex items-center text-gray-400 text-xs gap-1">
+<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+<path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+              11:14
+            </div>
+<span class="text-go-dark-green font-mono font-bold">07:01:00</span>
+</div>
+</div>
+</div>
+<!-- Green Progress Bar -->
+<div class="absolute bottom-0 left-0 h-1.5 bg-green-800 w-[25%] rounded-tr-full"></div>
+<div class="absolute bottom-0 left-0 h-1.5 bg-gray-100 w-full -z-10"></div>
+</div>
+</main>
+<!-- END: Task List Main Area -->
+<!-- BEGIN: Bottom Navigation -->
+<nav class="fixed bottom-0 left-0 right-0 bg-go-dark-green border-t border-white/5 safe-bottom flex justify-around items-center py-3 px-4" data-purpose="bottom-nav">
+<!-- Nav Item: Home -->
+<div class="flex flex-col items-center gap-1">
+<svg class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+<path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path>
+</svg>
+<span class="text-[10px] text-gray-400">Home</span>
+</div>
+<!-- Nav Item: Lịch (Active) -->
+<div class="flex flex-col items-center gap-1 bg-white/5 rounded-2xl px-4 py-1">
+<svg class="h-6 w-6 text-go-lime-yellow" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+<path clip-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" fill-rule="evenodd"></path>
+</svg>
+<span class="text-[10px] text-go-lime-yellow font-bold">Lịch</span>
+</div>
+<!-- Nav Item: Dinh dưỡng -->
+<div class="flex flex-col items-center gap-1">
+<svg class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+<path d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path>
+</svg>
+<span class="text-[10px] text-gray-400">Dinh dưỡng</span>
+</div>
+<!-- Nav Item: Giấc ngủ -->
+<div class="flex flex-col items-center gap-1">
+<svg class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+<path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path>
+</svg>
+<span class="text-[10px] text-gray-400">Giấc ngủ</span>
+</div>
+<!-- Nav Item: Hồ sơ -->
+<div class="flex flex-col items-center gap-1">
+<svg class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+<path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path>
+</svg>
+<span class="text-[10px] text-gray-400">Hồ sơ</span>
+</div>
+</nav>
+<!-- END: Bottom Navigation -->
+<!-- Floating iOS indicator bar at very bottom -->
+<div class="fixed bottom-1 left-1/2 -translate-x-1/2 w-32 h-1.5 bg-gray-600/30 rounded-full"></div>
+
+
+</body></html>

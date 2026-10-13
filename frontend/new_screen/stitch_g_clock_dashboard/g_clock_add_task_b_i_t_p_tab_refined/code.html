@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-primary": "#1d3528",
+                    "inverse-primary": "#4a6455",
+                    "on-surface": "#dfe3e9",
+                    "inverse-surface": "#dfe3e9",
+                    "on-secondary-container": "#4a6400",
+                    "tertiary": "#ffb3ae",
+                    "background": "#0f1418",
+                    "surface-container-low": "#171c20",
+                    "error-container": "#93000a",
+                    "surface-dim": "#0f1418",
+                    "surface": "#0f1418",
+                    "primary-fixed": "#cde9d6",
+                    "on-tertiary-fixed-variant": "#930014",
+                    "tertiary-container": "#480005",
+                    "primary": "#b1cdbb",
+                    "on-surface-variant": "#c2c8c2",
+                    "surface-container": "#1b2025",
+                    "on-tertiary-container": "#f54647",
+                    "outline": "#8c928d",
+                    "on-error": "#690005",
+                    "on-background": "#dfe3e9",
+                    "surface-container-high": "#262a2f",
+                    "secondary-fixed-dim": "#a3d800",
+                    "surface-variant": "#31353a",
+                    "surface-bright": "#353a3e",
+                    "tertiary-fixed-dim": "#ffb3ae",
+                    "tertiary-fixed": "#ffdad7",
+                    "surface-tint": "#b1cdbb",
+                    "on-tertiary-fixed": "#410004",
+                    "on-secondary-fixed-variant": "#394d00",
+                    "on-primary-fixed": "#072014",
+                    "secondary-container": "#afe700",
+                    "on-secondary-fixed": "#151f00",
+                    "on-secondary": "#263500",
+                    "on-error-container": "#ffdad6",
+                    "surface-container-lowest": "#0a0f13",
+                    "outline-variant": "#424844",
+                    "primary-container": "#0b2418",
+                    "on-tertiary": "#68000b",
+                    "on-primary-fixed-variant": "#334c3e",
+                    "inverse-on-surface": "#2c3136",
+                    "primary-fixed-dim": "#b1cdbb",
+                    "on-primary-container": "#728d7d",
+                    "secondary-fixed": "#bcf520",
+                    "secondary": "#d8ff7f",
+                    "surface-container-highest": "#31353a",
+                    "error": "#ffb4ab"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "stack-sm": "0.5rem",
+                    "stack-md": "1rem",
+                    "stack-lg": "2rem",
+                    "container-margin": "1.5rem",
+                    "gutter": "1rem"
+            },
+            "fontFamily": {
+                    "label-status": ["Inter"],
+                    "headline-md": ["Inter"],
+                    "body-sm": ["Inter"],
+                    "label-caps": ["Inter"],
+                    "body-lg": ["Inter"],
+                    "headline-lg": ["Inter"],
+                    "headline-lg-mobile": ["Inter"]
+            },
+            "fontSize": {
+                    "label-status": ["12px", {"lineHeight": "16px", "fontWeight": "600"}],
+                    "headline-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                    "body-sm": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "label-caps": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                    "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "headline-lg-mobile": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "700"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .bottom-sheet-gradient {
+            background: linear-gradient(to bottom, #0b2418 0%, #0f1418 100%);
+        }
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-black flex items-end justify-center min-h-screen font-body-lg text-on-background">
+<!-- Backdrop for Bottom Sheet -->
+<div class="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"></div>
+<!-- Bottom Sheet Container (75% height) -->
+<main class="relative z-50 w-full max-w-md h-[751px] bottom-sheet-gradient rounded-t-[2.5rem] flex flex-col overflow-hidden border-t border-outline-variant/30">
+<!-- Drag Handle Indicator -->
+<div class="flex justify-center pt-3 pb-2">
+<div class="w-12 h-1.5 bg-surface-variant rounded-full opacity-40"></div>
+</div>
+<!-- Header -->
+<header class="flex items-center justify-between px-6 py-4">
+<button class="font-headline-md text-headline-md text-on-surface-variant hover:text-on-surface transition-colors">Hủy</button>
+<h1 class="font-headline-md text-headline-md text-on-surface tracking-tight">Thêm mới</h1>
+<button class="px-6 py-2 bg-secondary text-on-secondary-container font-label-status text-label-status rounded-full active:scale-95 transition-transform">Lưu</button>
+</header>
+<!-- Main Content Area -->
+<div class="flex-1 overflow-y-auto hide-scrollbar px-6 pb-24 space-y-8">
+<!-- Tab Switcher -->
+<div class="p-1 bg-surface-container-high rounded-xl flex items-center">
+<button class="flex-1 py-2.5 rounded-lg text-on-surface-variant font-label-status text-label-status transition-all">Lịch học</button>
+<button class="flex-1 py-2.5 rounded-lg bg-secondary text-on-secondary-container font-label-status text-label-status shadow-lg">Bài tập</button>
+</div>
+<!-- Task Name Input -->
+<section class="space-y-2">
+<label class="font-label-caps text-label-caps text-outline uppercase tracking-widest ml-1">Tên bài tập</label>
+<div class="bg-surface-container-low border border-outline-variant/30 rounded-xl p-4 focus-within:border-secondary transition-colors group">
+<input class="w-full bg-transparent border-none p-0 focus:ring-0 text-headline-md font-headline-md text-on-surface placeholder:text-on-surface-variant/40" placeholder="Nộp báo cáo EXE101" type="text"/>
+</div>
+</section>
+<!-- Subject Tagging -->
+<section class="space-y-3">
+<label class="font-label-caps text-label-caps text-outline uppercase tracking-widest ml-1">Gắn thẻ môn học</label>
+<div class="flex gap-3 overflow-x-auto hide-scrollbar pb-1">
+<button class="flex-shrink-0 px-4 py-2 bg-secondary-container/20 border border-secondary text-secondary rounded-full font-label-status text-label-status flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+                        Kinh tế
+                    </button>
+<button class="flex-shrink-0 px-4 py-2 bg-surface-container-high text-on-surface-variant rounded-full font-label-status text-label-status flex items-center gap-2 hover:bg-surface-variant transition-colors">
+<span class="w-2 h-2 rounded-full bg-tertiary"></span>
+                        Toán rời rạc
+                    </button>
+<button class="flex-shrink-0 px-4 py-2 bg-surface-container-high text-on-surface-variant rounded-full font-label-status text-label-status flex items-center gap-2 hover:bg-surface-variant transition-colors">
+<span class="w-2 h-2 rounded-full bg-blue-400"></span>
+                        Lập trình
+                    </button>
+<button class="flex-shrink-0 w-10 h-10 flex items-center justify-center bg-surface-container-high rounded-full text-on-surface-variant">
+<span class="material-symbols-outlined">add</span>
+</button>
+</div>
+</section>
+<!-- Deadline Selection -->
+<section class="grid grid-cols-1 gap-4">
+<div class="space-y-2">
+<div class="flex justify-between items-end ml-1">
+<label class="font-label-caps text-label-caps text-outline uppercase tracking-widest">Hạn nộp (Deadline)</label>
+<span class="font-label-status text-label-status text-on-tertiary-container bg-tertiary-container/30 px-2 py-0.5 rounded animate-pulse">Còn 12 giờ nữa</span>
+</div>
+<button class="w-full flex items-center justify-between bg-surface-container-low border border-outline-variant/30 rounded-xl p-4 active:bg-surface-variant transition-colors">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary">calendar_month</span>
+<span class="font-body-lg text-body-lg text-on-surface">23:59 ngày 24/06</span>
+</div>
+<span class="material-symbols-outlined text-outline-variant">chevron_right</span>
+</button>
+</div>
+</section>
+<!-- Reminder -->
+<section class="space-y-2">
+<label class="font-label-caps text-label-caps text-outline uppercase tracking-widest ml-1">Nhắc nhở</label>
+<button class="w-full flex items-center justify-between bg-surface-container-low border border-outline-variant/30 rounded-xl p-4 active:bg-surface-variant transition-colors">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary">notifications</span>
+<span class="font-body-lg text-body-lg text-on-surface">Trước 1 ngày</span>
+</div>
+<span class="material-symbols-outlined text-outline-variant">keyboard_arrow_down</span>
+</button>
+</section>
+<!-- Estimated Duration -->
+<section class="space-y-3">
+<label class="font-label-caps text-label-caps text-outline uppercase tracking-widest ml-1">Thời lượng dự kiến</label>
+<div class="grid grid-cols-4 gap-3">
+<button class="py-3 bg-surface-container-high text-on-surface-variant font-label-status text-label-status rounded-xl hover:bg-surface-variant active:bg-secondary active:text-on-secondary-container transition-all">15p</button>
+<button class="py-3 bg-surface-container-high text-on-surface-variant font-label-status text-label-status rounded-xl hover:bg-surface-variant active:bg-secondary active:text-on-secondary-container transition-all">30p</button>
+<button class="py-3 bg-secondary text-on-secondary-container font-label-status text-label-status rounded-xl shadow-md">1h</button>
+<button class="py-3 bg-surface-container-high text-on-surface-variant font-label-status text-label-status rounded-xl hover:bg-surface-variant active:bg-secondary active:text-on-secondary-container transition-all">2h</button>
+</div>
+</section>
+<!-- Additional Options -->
+<section class="space-y-4 pt-4 border-t border-outline-variant/10">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-outline">description</span>
+<span class="text-on-surface-variant font-body-sm text-body-sm">Thêm ghi chú...</span>
+</div>
+</div>
+</section>
+</div>
+<!-- Bottom Safe Area Padding -->
+<div class="h-8 bg-surface-container-lowest"></div>
+</main>
+<!-- Visual Polish: Floating Decor -->
+<div class="fixed top-20 right-10 w-32 h-32 bg-secondary/10 blur-[100px] rounded-full -z-10 pointer-events-none"></div>
+<div class="fixed bottom-40 left-10 w-48 h-48 bg-primary/5 blur-[120px] rounded-full -z-10 pointer-events-none"></div>
+<script>
+        // Micro-interaction for quick selection
+        const durationButtons = document.querySelectorAll('.grid-cols-4 button');
+        durationButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                durationButtons.forEach(b => {
+                    b.classList.remove('bg-secondary', 'text-on-secondary-container', 'shadow-md');
+                    b.classList.add('bg-surface-container-high', 'text-on-surface-variant');
+                });
+                btn.classList.add('bg-secondary', 'text-on-secondary-container', 'shadow-md');
+                btn.classList.remove('bg-surface-container-high', 'text-on-surface-variant');
+            });
+        });
+
+        // Tab switcher interaction
+        const tabs = document.querySelectorAll('.bg-surface-container-high button');
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                tabs.forEach(t => {
+                    t.classList.remove('bg-secondary', 'text-on-secondary-container', 'shadow-lg');
+                    t.classList.add('text-on-surface-variant');
+                });
+                tab.classList.add('bg-secondary', 'text-on-secondary-container', 'shadow-lg');
+                tab.classList.remove('text-on-surface-variant');
+            });
+        });
+    </script>
+</body></html>

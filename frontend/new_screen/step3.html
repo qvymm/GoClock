@@ -1,0 +1,255 @@
+<!DOCTYPE html><html class="dark" lang="vi"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport">
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary": "#ffb3ae",
+                        "tertiary-fixed-dim": "#ffb3ae",
+                        "on-tertiary-fixed-variant": "#930014",
+                        "on-secondary": "#263500",
+                        "on-primary-fixed-variant": "#334c3e",
+                        "secondary-fixed": "#bcf520",
+                        "on-error-container": "#ffdad6",
+                        "surface-container-lowest": "#0a0f13",
+                        "on-secondary-fixed-variant": "#394d00",
+                        "inverse-surface": "#dfe3e9",
+                        "on-secondary-fixed": "#151f00",
+                        "error": "#ffb4ab",
+                        "on-tertiary-fixed": "#410004",
+                        "surface-variant": "#31353a",
+                        "on-primary-fixed": "#072014",
+                        "on-primary": "#1d3528",
+                        "inverse-primary": "#4a6455",
+                        "surface-dim": "#0f1418",
+                        "surface-container-low": "#171c20",
+                        "outline-variant": "#424844",
+                        "error-container": "#93000a",
+                        "on-error": "#690005",
+                        "surface": "#0f1418",
+                        "on-tertiary": "#68000b",
+                        "on-primary-container": "#728d7d",
+                        "surface-container-highest": "#31353a",
+                        "secondary": "#d8ff7f",
+                        "primary-container": "#0b2418",
+                        "secondary-fixed-dim": "#a3d800",
+                        "background": "#0f1418",
+                        "tertiary-container": "#480005",
+                        "on-surface": "#dfe3e9",
+                        "tertiary-fixed": "#ffdad7",
+                        "primary-fixed": "#cde9d6",
+                        "surface-tint": "#b1cdbb",
+                        "on-background": "#dfe3e9",
+                        "surface-container-high": "#262a2f",
+                        "surface-container": "#1b2025",
+                        "primary-fixed-dim": "#b1cdbb",
+                        "on-secondary-container": "#4a6400",
+                        "outline": "#8c928d",
+                        "surface-bright": "#353a3e",
+                        "on-surface-variant": "#c2c8c2",
+                        "secondary-container": "#afe700",
+                        "on-tertiary-container": "#f54647",
+                        "inverse-on-surface": "#2c3136",
+                        "primary": "#b1cdbb"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-sm": "0.5rem",
+                        "gutter": "1rem",
+                        "stack-md": "1rem",
+                        "container-margin": "1.5rem",
+                        "stack-lg": "2rem"
+                    },
+                    "fontFamily": {
+                        "body-sm": ["Inter"],
+                        "label-caps": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "label-status": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "body-lg": ["Inter"]
+                    },
+                    "fontSize": {
+                        "body-sm": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                        "label-caps": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                        "headline-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                        "label-status": ["12px", {"lineHeight": "16px", "fontWeight": "600"}],
+                        "headline-lg-mobile": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+        .ruler-container::-webkit-scrollbar { display: none; }
+        .ruler-container { -ms-overflow-style: none; scrollbar-width: none; scroll-snap-type: x mandatory; }
+        .ruler-mark { scroll-snap-align: center; }
+        .glass-header { backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+        .active-glow { box-shadow: 0 0 20px rgba(175, 231, 0, 0.2); }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-background text-on-background min-h-screen flex flex-col selection:bg-secondary selection:text-on-secondary overflow-hidden">
+<!-- Top Navigation Area -->
+<header class="fixed top-0 w-full z-50 glass-header border-b border-outline-variant/10 px-container-margin h-16 flex items-center justify-between">
+<button class="w-10 h-10 flex items-center justify-center rounded-full active:scale-95 transition-transform text-on-surface-variant">
+<span class="material-symbols-outlined">arrow_back_ios_new</span>
+</button>
+<div class="flex-1 px-4">
+<div class="h-1.5 w-full bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full bg-secondary w-3/8 rounded-full transition-all duration-700 ease-out"></div>
+</div>
+</div>
+<div class="text-on-surface-variant font-label-status text-label-status">3/8</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-1 mt-16 px-container-margin pb-32 overflow-y-auto">
+<!-- Animated Background Ornament -->
+<div class="absolute top-20 right-0 -z-10 opacity-20 pointer-events-none">
+
+</div>
+<section class="mt-8 space-y-2">
+<span class="text-secondary font-label-caps text-label-caps tracking-widest">CHỈ SỐ CƠ THỂ</span>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-on-background">Chiều cao và cân nặng hiện tại của bạn?</h1>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Thông tin này giúp GõClock tính toán chỉ số BMI và lịch trình vận động chính xác hơn.</p>
+</section>
+<!-- Picker Section -->
+<div class="mt-stack-lg space-y-12">
+<!-- Height Picker -->
+<div class="space-y-6">
+<div class="flex justify-between items-end">
+<label class="font-headline-md text-headline-md">Chiều cao</label>
+<div class="flex items-baseline gap-1">
+<span class="font-headline-lg text-headline-lg text-secondary" id="height-value">100</span>
+<span class="text-on-surface-variant font-body-sm text-body-sm">cm</span>
+</div>
+</div>
+<div class="relative py-4">
+<!-- Selector Indicator -->
+<div class="absolute left-1/2 top-0 -translate-x-1/2 w-0.5 h-full bg-secondary z-10 shadow-[0_0_8px_rgba(216,255,127,0.8)]"></div>
+<div class="ruler-container flex items-end gap-3 overflow-x-auto h-24 px-[50%]" id="height-ruler">
+<!-- JS will populate marks -->
+</div>
+</div>
+</div>
+<!-- Weight Picker -->
+<div class="space-y-6">
+<div class="flex justify-between items-end">
+<label class="font-headline-md text-headline-md">Cân nặng</label>
+<div class="flex items-baseline gap-1">
+<span class="font-headline-lg text-headline-lg text-secondary" id="weight-value">30</span>
+<span class="text-on-surface-variant font-body-sm text-body-sm">kg</span>
+</div>
+</div>
+<div class="relative py-4">
+<!-- Selector Indicator -->
+<div class="absolute left-1/2 top-0 -translate-x-1/2 w-0.5 h-full bg-secondary z-10 shadow-[0_0_8px_rgba(216,255,127,0.8)]"></div>
+<div class="ruler-container flex items-end gap-3 overflow-x-auto h-24 px-[50%]" id="weight-ruler">
+<!-- JS will populate marks -->
+</div>
+</div>
+</div>
+</div>
+<div class="mt-12 flex items-center justify-center gap-2 text-on-surface-variant opacity-60">
+<span class="material-symbols-outlined text-sm">lock</span>
+<p class="font-body-sm text-body-sm italic">Đừng lo, thông tin này được bảo mật 100%.</p>
+</div>
+</main>
+<!-- Bottom Actions -->
+<footer class="fixed bottom-0 w-full p-container-margin bg-gradient-to-t from-background via-background to-transparent pt-12">
+<button class="w-full bg-secondary text-on-secondary font-headline-md text-headline-md py-4 rounded-xl active:scale-[0.98] transition-all hover:opacity-90 shadow-lg shadow-secondary/10">
+            Tiếp tục
+        </button>
+</footer>
+<script>
+        function createRuler(containerId, valueId, min, max, initial, step = 1) {
+            const container = document.getElementById(containerId);
+            const valueDisplay = document.getElementById(valueId);
+            
+            for (let i = min; i <= max; i++) {
+                const mark = document.createElement('div');
+                mark.className = 'ruler-mark flex flex-col items-center flex-shrink-0';
+                mark.style.width = '24px';
+                
+                const bar = document.createElement('div');
+                const isMajor = i % 5 === 0;
+                bar.className = `w-0.5 rounded-full transition-colors ${isMajor ? 'h-10 bg-outline' : 'h-6 bg-outline-variant/40'}`;
+                
+                mark.appendChild(bar);
+                
+                if (isMajor) {
+                    const label = document.createElement('span');
+                    label.className = 'mt-2 text-[10px] font-label-caps text-on-surface-variant';
+                    label.textContent = i;
+                    mark.appendChild(label);
+                }
+                
+                container.appendChild(mark);
+            }
+
+            // Scroll to initial value
+            const scrollToIndex = initial - min;
+            const markWidth = 24 + 12; // width + gap
+            setTimeout(() => {
+                container.scrollLeft = scrollToIndex * markWidth;
+            }, 100);
+
+            container.addEventListener('scroll', () => {
+                const scrollPos = container.scrollLeft;
+                const index = Math.round(scrollPos / markWidth);
+                const currentValue = min + index;
+                if (currentValue >= min && currentValue <= max) {
+                    valueDisplay.textContent = currentValue;
+                    
+                    // Highlight logic
+                    const marks = container.querySelectorAll('.ruler-mark > div:first-child');
+                    marks.forEach((m, idx) => {
+                        if (idx === index) {
+                            m.classList.remove('bg-outline', 'bg-outline-variant/40');
+                            m.classList.add('bg-secondary');
+                            m.style.height = '48px';
+                        } else {
+                            const isM = (idx + min) % 5 === 0;
+                            m.classList.remove('bg-secondary');
+                            m.classList.add(isM ? 'bg-outline' : 'bg-outline-variant/40');
+                            m.style.height = isM ? '40px' : '24px';
+                        }
+                    });
+                }
+            });
+        }
+
+        // Initialize Rulers
+        createRuler('height-ruler', 'height-value', 100, 220, 170);
+        createRuler('weight-ruler', 'weight-value', 30, 150, 65);
+
+        // Haptic feedback simulation
+        const rulers = document.querySelectorAll('.ruler-container');
+        rulers.forEach(r => {
+            r.addEventListener('scroll', () => {
+                if (window.navigator.vibrate) {
+                    window.navigator.vibrate(2);
+                }
+            });
+        });
+    </script>
+</body></html>
