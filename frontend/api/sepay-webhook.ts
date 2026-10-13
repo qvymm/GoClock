@@ -1,4 +1,4 @@
-import { adminSupabase, matchesSePayKey, sendJson } from '../server/payment';
+import { adminSupabase, matchesSePayKey, sendJson } from '../server/payment.js';
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return sendJson(res, 405, { success: false, message: 'Method not allowed' });

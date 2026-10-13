@@ -1,4 +1,4 @@
-import { adminSupabase, authenticatedUserId, sendJson } from '../server/payment';
+import { adminSupabase, authenticatedUserId, sendJson } from '../server/payment.js';
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'GET') return sendJson(res, 405, { error: 'Method not allowed' });
