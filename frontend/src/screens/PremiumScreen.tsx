@@ -25,6 +25,19 @@ const bank = {
   holder: paymentEnv.VITE_PREMIUM_BANK_HOLDER as string | undefined,
 };
 
+async function readApiResponse(response: Response) {
+  const body = await response.text();
+  if (!body) return {};
+  try {
+    return JSON.parse(body);
+  } catch {
+    const detail = body.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 220);
+    throw new Error(
+      `API thanh toán trả phản hồi không hợp lệ (${response.status}). ${detail || 'Kiểm tra Vercel Function Logs.'}`,
+    );
+  }
+}
+
 export function PremiumScreen() {
   const { theme, setScreen, profile, setProfile } = useApp();
   const [selectedPlan, setSelectedPlan] = useState('yearly');
@@ -53,7 +66,7 @@ export function PremiumScreen() {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({ plan: selectedPlan }),
       });
-      const result = await response.json();
+      const result = await readApiResponse(response);
       if (!response.ok) throw new Error(result.error || 'Không tạo được đơn thanh toán.');
       setTransferCode(result.code);
       setPaymentAmount(Number(result.amount));
@@ -88,7 +101,7 @@ export function PremiumScreen() {
         const response = await fetch(`/api/order-status?code=${encodeURIComponent(transferCode)}`, {
           headers: { Authorization: `Bearer ${session.access_token}` },
         });
-        const result = await response.json();
+        const result = await readApiResponse(response);
         if (!response.ok || !active) return;
         if (result.status === 'paid') {
           setPaymentStatus('paid');
