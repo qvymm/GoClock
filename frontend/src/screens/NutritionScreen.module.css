@@ -1,0 +1,1164 @@
+.screen {
+  --bg: #08200f;
+  --bg2: #0f2f1a;
+  --bg3: #17402a;
+  --lime: #c9f24f;
+  --paper: #f3f8f4;
+  --ink: #0f2418;
+  --ink2: #5a6e61;
+  --line: #e0eae3;
+  display: flex;
+  position: relative;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg);
+  color: #fff;
+  font-family: "Be Vietnam Pro", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.screen button,
+.screen input {
+  font: inherit;
+}
+
+.screen button {
+  color: inherit;
+}
+
+.screen button:focus-visible,
+.screen input:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 2px;
+}
+
+.header {
+  flex: none;
+  padding: 14px 16px 16px;
+  background: linear-gradient(160deg, #0d2817 0%, #12361f 100%);
+}
+
+.headingRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.headingRow h1 {
+  margin: 0;
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.headingRow p {
+  margin: 2px 0 0;
+  color: #8fb09b;
+  font-size: 13px;
+}
+
+.addButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1.5px solid var(--lime);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--lime) !important;
+  font-size: 14px !important;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.addButton:hover {
+  background: rgb(201 242 79 / 12%);
+}
+
+.summary {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.ring {
+  position: relative;
+  width: 132px;
+  height: 132px;
+}
+
+.ring svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.ringTrack,
+.ringProgress {
+  fill: none;
+  stroke-width: 10px;
+}
+
+.ringTrack {
+  stroke: #173a25;
+}
+
+.ringProgress {
+  stroke: var(--lime);
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.5s, stroke 0.3s;
+}
+
+.ringOver .ringProgress {
+  stroke: #ffb347;
+}
+
+.ringContent {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.ringContent strong {
+  font-size: 27px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.05;
+}
+
+.ringContent small {
+  margin-top: 3px;
+  color: #8fb09b;
+  font-size: 11px;
+}
+
+.ringContent span {
+  margin-top: 3px;
+  color: var(--lime);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.macros {
+  display: grid;
+  gap: 7px;
+}
+
+.macro {
+  padding: 8px 10px 9px;
+  border-radius: 13px;
+  background: var(--bg2);
+}
+
+.macroRow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+}
+
+.macroRow > i {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+}
+
+.macroRow > span {
+  color: #d5e8db;
+}
+
+.macroRow strong {
+  margin-left: auto;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.macroRow small {
+  color: #7fa08b;
+  font-size: 10px;
+  font-weight: 400;
+}
+
+.macroTrack {
+  height: 4px;
+  margin-top: 6px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: #173a25;
+}
+
+.macroTrack i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  transition: width 0.4s;
+}
+
+.content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 12px 26px;
+  overscroll-behavior: contain;
+  border-radius: 22px 22px 0 0;
+  margin: 0 10px;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.advice {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  border: 1px solid #bfe8cc;
+  border-radius: 13px;
+  background: #dcf5e3;
+  color: #1b6b38;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.advice svg {
+  flex: none;
+  margin-top: 1px;
+}
+
+.sectionTitle {
+  margin: 2px 4px 9px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.mealCard {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  color: var(--ink) !important;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mealCard:hover {
+  background: #fbfefb;
+}
+
+.mealEmoji,
+.foodEmoji {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  place-items: center;
+  border-radius: 12px;
+  background: #eef5ef;
+  font-size: 22px;
+}
+
+.mealDetails {
+  display: block;
+  min-width: 0;
+}
+
+.mealDetails > strong {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.mealMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-top: 4px;
+  color: var(--ink2);
+  font-size: 11px;
+}
+
+.mealMeta i {
+  padding: 1px 7px;
+  border-radius: 7px;
+  background: #e3f1e7;
+  color: #1b6b38;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 600;
+}
+
+.mealMacros {
+  display: block;
+  margin-top: 3px;
+  color: var(--ink2);
+  font-size: 10px;
+}
+
+.mealMacros b {
+  color: #33493b;
+  font-weight: 600;
+}
+
+.mealCalories {
+  align-self: start;
+  padding-top: 2px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.mealCalories small {
+  color: var(--ink2);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fff;
+  text-align: center;
+}
+
+.empty > span {
+  margin-bottom: 7px;
+  font-size: 30px;
+}
+
+.empty strong {
+  font-size: 14px;
+}
+
+.empty p {
+  margin: 5px 0 12px;
+  color: var(--ink2);
+  font-size: 12px;
+}
+
+.empty button,
+.customPrompt button {
+  padding: 9px 14px;
+  border: 0;
+  border-radius: 11px;
+  background: var(--lime);
+  color: #10250a !important;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.schedule {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fff;
+}
+
+.schedule .sectionTitle {
+  margin: 2px 2px 2px;
+}
+
+.scheduleHint {
+  margin: 0 2px 5px;
+  color: var(--ink2);
+  font-size: 11px;
+}
+
+.scheduleRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 9px;
+  width: 100%;
+  padding: 8px 3px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: inherit !important;
+  text-align: left;
+  cursor: pointer;
+}
+
+.scheduleRow:first-of-type {
+  border-top: 0;
+}
+
+.scheduleRow:hover {
+  background: #f4faf5;
+}
+
+.scheduleRow > strong {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.scheduleRow > span {
+  color: var(--ink2);
+  font-size: 10px;
+}
+
+.scheduleRow em {
+  display: flex;
+  grid-column: 2;
+  grid-row: 1 / 3;
+  align-items: center;
+  gap: 5px;
+  color: #2e9e57;
+  font-size: 11px;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.scheduleRow em svg:last-child {
+  color: #b2c2b8;
+}
+
+.scheduleRow .reminderOff {
+  color: var(--ink2);
+}
+
+.overlay {
+  position: absolute;
+  z-index: 40;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  background: rgb(2 10 5 / 65%);
+}
+
+.sheet {
+  display: flex;
+  width: 100%;
+  max-height: 90%;
+  flex-direction: column;
+  overflow: hidden;
+  border-top: 1px solid #1f4a30;
+  border-radius: 26px 26px 0 0;
+  background: #0e2717;
+  box-shadow: 0 -15px 45px rgb(0 0 0 / 20%);
+  color: #fff;
+}
+
+.reminderSheet {
+  max-height: 90%;
+}
+
+.grab {
+  width: 40px;
+  height: 4px;
+  flex: none;
+  margin: 8px auto 0;
+  border-radius: 4px;
+  background: #3a6a4b;
+}
+
+.sheetHeader {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px 8px;
+}
+
+.sheetHeader h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.roundButton {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  color: #1b3a27 !important;
+  cursor: pointer;
+}
+
+.sheetBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 16px 14px;
+  overscroll-behavior: contain;
+}
+
+.lead {
+  margin: 4px 0 12px;
+  color: #a9c7b4;
+  font-size: 13px;
+}
+
+.methodCard {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 12px;
+  border: 1px solid transparent;
+  border-radius: 17px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.methodCard > span {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  border-radius: 14px;
+}
+
+.methodCard > i {
+  font-style: normal;
+}
+
+.methodCard strong,
+.methodCard small {
+  display: block;
+}
+
+.methodCard strong {
+  font-size: 15px;
+}
+
+.methodCard small {
+  margin-top: 3px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.methodPhoto {
+  background: #fcf1ec;
+  color: #8a3318 !important;
+}
+
+.methodPhoto > span {
+  background: #f6dcd2;
+}
+
+.methodPhoto small {
+  color: #8a3318b0;
+}
+
+.methodLibrary {
+  background: #e8f0fb;
+  color: #1f58b8 !important;
+}
+
+.methodLibrary > span {
+  background: #d3e1f7;
+}
+
+.methodLibrary small {
+  color: #1f58b8b0;
+}
+
+.methodManual {
+  background: #e5f4ea;
+  color: #17703a !important;
+}
+
+.methodManual > span {
+  background: #cfe9d8;
+}
+
+.methodManual small {
+  color: #17703ab0;
+}
+
+.photoNote {
+  margin: 12px 2px 2px;
+  color: #8fb09b;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.searchBox {
+  position: sticky;
+  z-index: 1;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 8px;
+  padding: 10px 12px;
+  border: 1px solid #2a5a3d;
+  border-radius: 13px;
+  background: #15381f;
+  color: #8fb09b;
+}
+
+.searchBox input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #fff;
+  font-size: 14px;
+}
+
+.searchBox input::placeholder {
+  color: #7fa08b;
+}
+
+.foodList {
+  display: grid;
+}
+
+.foodRow {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 10px 2px;
+  border: 0;
+  border-bottom: 1px solid #1a3d28;
+  background: transparent;
+  color: #fff !important;
+  text-align: left;
+  cursor: pointer;
+}
+
+.foodRow:hover {
+  background: #12301f;
+}
+
+.foodRow .foodEmoji {
+  width: 42px;
+  height: 42px;
+  background: #17402a;
+  font-size: 21px;
+}
+
+.foodRow strong,
+.foodRow small {
+  display: block;
+}
+
+.foodRow strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.foodRow small {
+  margin-top: 3px;
+  color: #8fb09b;
+  font-size: 11px;
+}
+
+.foodRow em {
+  color: var(--lime);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.customPrompt {
+  margin-top: 14px;
+  padding: 13px;
+  border: 1.5px dashed #3a6a4b;
+  border-radius: 14px;
+  color: #cfe3d6;
+  font-size: 12px;
+  text-align: center;
+}
+
+.customPrompt p {
+  margin: 5px 0 0;
+}
+
+.customPrompt button {
+  margin-top: 10px;
+}
+
+.photoWarning {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 10px;
+  border-radius: 13px;
+  background: #3a3216;
+  color: #ffe08a;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.photoWarning img {
+  width: 58px;
+  height: 58px;
+  flex: none;
+  border-radius: 10px;
+  object-fit: cover;
+}
+
+.photoWarning strong,
+.photoWarning small {
+  display: block;
+}
+
+.photoWarning small {
+  margin-top: 3px;
+  font-size: 10px;
+}
+
+.dishHeading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.dishHeading .foodEmoji {
+  width: 50px;
+  height: 50px;
+  background: #17402a;
+  font-size: 25px;
+}
+
+.dishHeading strong {
+  font-size: 17px;
+}
+
+.fieldLabel {
+  display: block;
+  margin: 14px 0 7px;
+  color: #a9c7b4;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.textInput {
+  width: 100%;
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid #2a5a3d;
+  border-radius: 12px;
+  background: #15381f;
+  color: #fff;
+}
+
+.textInput::placeholder {
+  color: #7fa08b;
+}
+
+.valueGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.valueGrid label > span {
+  display: block;
+  margin-bottom: 5px;
+  color: #a9c7b4;
+  font-size: 11px;
+}
+
+.valueGrid .textInput {
+  font-size: 13px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.chips button {
+  padding: 7px 11px;
+  border: 1.5px solid #2a5a3d;
+  border-radius: 99px;
+  background: #12301f;
+  color: #fff;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.chips button[aria-pressed="true"] {
+  border-color: var(--lime);
+  background: var(--lime);
+  color: #10250a;
+  font-weight: 700;
+}
+
+.chips button:disabled {
+  cursor: not-allowed;
+}
+
+.gramControl {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 42px;
+  align-items: center;
+  gap: 9px;
+  margin-top: 12px;
+}
+
+.gramControl > button {
+  display: grid;
+  height: 42px;
+  place-items: center;
+  border: 0;
+  border-radius: 12px;
+  background: #17402a;
+  cursor: pointer;
+}
+
+.gramControl label {
+  position: relative;
+}
+
+.gramControl input {
+  width: 100%;
+  padding: 8px 32px 8px 8px;
+  border: 1px solid #2a5a3d;
+  border-radius: 12px;
+  background: #15381f;
+  color: #fff;
+  font-size: 19px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.gramControl label > span {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+  color: #8fb09b;
+  font-size: 12px;
+}
+
+.range {
+  width: 100%;
+  margin: 11px 0 0;
+  accent-color: var(--lime);
+}
+
+.resultCard {
+  margin-top: 15px;
+  padding: 13px;
+  border: 1px solid #2a5a3d;
+  border-radius: 17px;
+  background: linear-gradient(160deg, #17402a, #123221);
+}
+
+.resultCard > strong {
+  color: var(--lime);
+  font-size: 30px;
+  font-variant-numeric: tabular-nums;
+}
+
+.resultCard > strong small {
+  color: #a9c7b4;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.resultCard > div {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+  margin-top: 9px;
+}
+
+.resultCard > div span {
+  padding: 7px 4px;
+  border-radius: 10px;
+  background: rgb(0 0 0 / 20%);
+  color: #a9c7b4;
+  font-size: 9px;
+  text-align: center;
+}
+
+.resultCard > div b {
+  display: block;
+  margin-top: 3px;
+  color: #fff;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.resultCard p {
+  margin: 9px 0 0;
+  color: #7fa08b;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.mealSegments {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.mealSegments button {
+  padding: 9px 2px;
+  border: 1.5px solid #2a5a3d;
+  border-radius: 11px;
+  background: #12301f;
+  color: #fff;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.mealSegments button[aria-pressed="true"] {
+  border-color: var(--lime);
+  background: var(--lime);
+  color: #10250a;
+  font-weight: 700;
+}
+
+.errorMessage {
+  margin: 12px 0 0;
+  color: #ff9b8f;
+  font-size: 12px;
+}
+
+.sheetFooter {
+  display: flex;
+  flex: none;
+  gap: 9px;
+  padding: 11px 16px calc(15px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid #1a3d28;
+  background: #0e2717;
+}
+
+.sheetFooter button {
+  display: inline-flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 45px;
+  padding: 10px 8px;
+  border: 0;
+  border-radius: 13px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sheetFooter button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.saveButton {
+  flex: 2 !important;
+  background: var(--lime);
+  color: #10250a !important;
+}
+
+.deleteButton {
+  background: #3b1c19;
+  color: #ff9b8f !important;
+}
+
+.reminderRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  padding: 12px;
+  border-radius: 13px;
+  background: #12301f;
+}
+
+.reminderRow > span {
+  min-width: 0;
+}
+
+.reminderRow strong,
+.reminderRow small {
+  display: block;
+}
+
+.reminderRow strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.reminderRow small {
+  margin-top: 3px;
+  color: #a9c7b4;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.switch {
+  position: relative;
+  width: 46px;
+  height: 27px;
+  flex: none;
+  border: 0;
+  border-radius: 99px;
+  background: #3a5a46;
+  cursor: pointer;
+}
+
+.switch::after {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 21px;
+  height: 21px;
+  border-radius: 50%;
+  background: #fff;
+  content: "";
+  transition: transform 0.15s;
+}
+
+.switchOn {
+  background: var(--lime);
+}
+
+.switchOn::after {
+  transform: translateX(19px);
+  background: #10250a;
+}
+
+.disabledSettings {
+  opacity: 0.45;
+}
+
+.disabledSettings .reminderRow:last-of-type {
+  opacity: 1;
+}
+
+.weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
+}
+
+.weekdays button {
+  padding: 9px 1px;
+  border: 1.5px solid #2a5a3d;
+  border-radius: 10px;
+  background: #12301f;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.weekdays button[aria-pressed="true"] {
+  border-color: var(--lime);
+  background: var(--lime);
+  color: #10250a;
+}
+
+.weekdays button:disabled {
+  cursor: not-allowed;
+}
+
+.reminderPreview {
+  display: flex;
+  gap: 8px;
+  margin-top: 13px;
+  padding: 10px;
+  border-radius: 12px;
+  background: #17402a;
+  color: #d5e8db;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.reminderPreview svg {
+  flex: none;
+  color: var(--lime);
+}
+
+.hiddenInput {
+  display: none;
+}
+
+@media (max-width: 360px) {
+  .header {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .summary {
+    grid-template-columns: 112px minmax(0, 1fr);
+    gap: 9px;
+  }
+
+  .ring {
+    width: 112px;
+    height: 112px;
+  }
+
+  .macro {
+    padding-right: 7px;
+    padding-left: 7px;
+  }
+
+  .macroRow {
+    gap: 5px;
+    font-size: 10px;
+  }
+
+  .macroRow strong {
+    font-size: 10px;
+  }
+
+  .mealCard {
+    grid-template-columns: 38px minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 9px;
+  }
+
+  .mealEmoji {
+    width: 38px;
+    height: 38px;
+  }
+
+  .mealMacros {
+    font-size: 9px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .screen *,
+  .screen *::before,
+  .screen *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

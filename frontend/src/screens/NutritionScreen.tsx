@@ -1,300 +1,998 @@
-import React, { useState } from 'react';
-import { Plus, X, Camera, Image, PenLine, Flame, Beef, Wheat, Droplets, Clock, ChevronRight, Info } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ArrowLeft,
+  Bell,
+  Camera,
+  ChevronRight,
+  Clock3,
+  Image as ImageIcon,
+  Info,
+  Minus,
+  PenLine,
+  Plus,
+  Search,
+  Trash2,
+  X,
+} from 'lucide-react';
+import type { Meal } from '../lib/supabase';
 import { supabase } from '../lib/supabase';
 import { useApp } from '../lib/AppContext';
+import styles from './NutritionScreen.module.css';
+
+type MealType = Meal['meal_type'];
+type MealKey = 'breakfast' | 'lunch' | 'snack' | 'dinner';
+type SheetView = 'menu' | 'search' | 'confirm' | 'remind';
+type MacroValues = { calories: string; protein: string; carbs: string; fat: string };
+type Portion = { label: string; grams: number };
+type Food = {
+  id: string;
+  name: string;
+  emoji: string;
+  protein: number;
+  carbs: number;
+  fat: number;
+  portions: Portion[];
+  defaultPortion: number;
+};
+type Draft = {
+  editId?: string;
+  food: Food | null;
+  custom: boolean;
+  name: string;
+  mealType: MealType;
+  grams: number;
+  values: MacroValues;
+  source: 'manual' | 'photo' | 'edit';
+  imagePreview?: string;
+  candidates: Food[];
+  confirmDelete: boolean;
+};
+type Reminder = {
+  enabled: boolean;
+  time: string;
+  lead: number;
+  days: boolean[];
+  skipIfLogged: boolean;
+};
+type ReminderDraft = { meal: MealKey; value: Reminder };
+type MealTotals = { calories: number; protein: number; carbs: number; fat: number };
+
+const CALORIE_GOAL_FALLBACK = 2000;
+const MACRO_SPLIT = { protein: 0.2, carbs: 0.5, fat: 0.3 };
+const WEEKDAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+const MEAL_TYPES: { key: MealType; label: string; shortLabel: string; emoji: string }[] = [
+  { key: 'breakfast', label: 'Bữa sáng', shortLabel: 'Sáng', emoji: '🌅' },
+  { key: 'lunch', label: 'Bữa trưa', shortLabel: 'Trưa', emoji: '☀️' },
+  { key: 'snack', label: 'Bữa phụ', shortLabel: 'Phụ', emoji: '🍎' },
+  { key: 'dinner', label: 'Bữa tối', shortLabel: 'Tối', emoji: '🌙' },
+];
+const MEAL_TYPE_ORDER = Object.fromEntries(MEAL_TYPES.map((meal, index) => [meal.key, index])) as Record<MealType, number>;
+const MEAL_NAMES: Record<MealKey, string> = {
+  breakfast: 'bữa sáng',
+  lunch: 'bữa trưa',
+  snack: 'bữa phụ',
+  dinner: 'bữa tối',
+};
+const MEAL_SHARES: Record<MealKey, number> = {
+  breakfast: 0.25,
+  lunch: 0.35,
+  snack: 0.1,
+  dinner: 0.3,
+};
+const FOODS: Food[] = [
+  { id: 'pho', name: 'Phở bò tái', emoji: '🍜', protein: 5, carbs: 11, fat: 2.2, portions: [{ label: 'Tô nhỏ', grams: 350 }, { label: 'Tô vừa', grams: 450 }, { label: 'Tô lớn', grams: 600 }], defaultPortion: 1 },
+  { id: 'bunbo', name: 'Bún bò Huế', emoji: '🍲', protein: 5.5, carbs: 10, fat: 3, portions: [{ label: 'Tô nhỏ', grams: 400 }, { label: 'Tô vừa', grams: 500 }, { label: 'Tô lớn', grams: 650 }], defaultPortion: 1 },
+  { id: 'comga', name: 'Cơm gà xối mỡ', emoji: '🍗', protein: 11, carbs: 20, fat: 6.5, portions: [{ label: 'Đĩa nhỏ', grams: 300 }, { label: 'Đĩa vừa', grams: 350 }, { label: 'Đĩa lớn', grams: 450 }], defaultPortion: 1 },
+  { id: 'comtam', name: 'Cơm tấm sườn', emoji: '🍛', protein: 12, carbs: 22, fat: 8.5, portions: [{ label: 'Đĩa vừa', grams: 350 }, { label: 'Đĩa lớn', grams: 450 }], defaultPortion: 0 },
+  { id: 'comtrang', name: 'Cơm trắng', emoji: '🍚', protein: 2.7, carbs: 28, fat: 0.3, portions: [{ label: '½ chén', grams: 80 }, { label: '1 chén', grams: 160 }, { label: '1 chén đầy', grams: 220 }], defaultPortion: 1 },
+  { id: 'banhmi', name: 'Bánh mì thịt', emoji: '🥖', protein: 11, carbs: 34, fat: 9, portions: [{ label: 'Ổ nhỏ', grams: 130 }, { label: 'Ổ vừa', grams: 180 }, { label: 'Ổ lớn', grams: 230 }], defaultPortion: 1 },
+  { id: 'goicuon', name: 'Gỏi cuốn tôm thịt', emoji: '🥬', protein: 6, carbs: 14, fat: 1.5, portions: [{ label: '1 cuốn', grams: 60 }, { label: '2 cuốn', grams: 120 }, { label: '3 cuốn', grams: 180 }], defaultPortion: 1 },
+  { id: 'bunthit', name: 'Bún thịt nướng', emoji: '🍜', protein: 8, carbs: 18, fat: 5, portions: [{ label: 'Tô vừa', grams: 400 }, { label: 'Tô lớn', grams: 500 }], defaultPortion: 0 },
+  { id: 'ga', name: 'Ức gà luộc', emoji: '🍖', protein: 31, carbs: 0, fat: 3.6, portions: [{ label: '½ ức', grams: 100 }, { label: '1 ức', grams: 150 }], defaultPortion: 1 },
+  { id: 'trung', name: 'Trứng gà luộc', emoji: '🥚', protein: 13, carbs: 1, fat: 10.5, portions: [{ label: '1 quả', grams: 50 }, { label: '2 quả', grams: 100 }], defaultPortion: 0 },
+  { id: 'rau', name: 'Rau muống xào tỏi', emoji: '🥗', protein: 2.5, carbs: 3, fat: 5, portions: [{ label: 'Đĩa nhỏ', grams: 120 }, { label: 'Đĩa vừa', grams: 180 }], defaultPortion: 1 },
+  { id: 'canhchua', name: 'Canh chua cá', emoji: '🥣', protein: 4, carbs: 3, fat: 1.5, portions: [{ label: 'Bát nhỏ', grams: 250 }, { label: 'Tô vừa', grams: 350 }], defaultPortion: 0 },
+  { id: 'suachua', name: 'Sữa chua có đường', emoji: '🥛', protein: 3.5, carbs: 14, fat: 2.5, portions: [{ label: '1 hũ', grams: 100 }, { label: '1 hũ lớn', grams: 130 }], defaultPortion: 1 },
+  { id: 'chuoi', name: 'Chuối', emoji: '🍌', protein: 1.1, carbs: 23, fat: 0.3, portions: [{ label: '1 quả nhỏ', grams: 80 }, { label: '1 quả', grams: 110 }], defaultPortion: 1 },
+  { id: 'cfsua', name: 'Cà phê sữa đá', emoji: '☕', protein: 1.2, carbs: 13, fat: 1.4, portions: [{ label: 'Ly nhỏ', grams: 150 }, { label: 'Ly vừa', grams: 250 }], defaultPortion: 1 },
+  { id: 'trasua', name: 'Trà sữa trân châu', emoji: '🧋', protein: 1, carbs: 16, fat: 2, portions: [{ label: 'Ly vừa', grams: 500 }, { label: 'Ly lớn', grams: 700 }], defaultPortion: 0 },
+];
+const DEFAULT_REMINDERS: Record<MealKey, Reminder> = {
+  breakfast: { enabled: true, time: '07:00', lead: 0, days: [true, true, true, true, true, true, true], skipIfLogged: true },
+  lunch: { enabled: true, time: '12:00', lead: 0, days: [true, true, true, true, true, true, true], skipIfLogged: true },
+  snack: { enabled: true, time: '15:30', lead: 0, days: [true, true, true, true, true, true, true], skipIfLogged: true },
+  dinner: { enabled: true, time: '18:30', lead: 0, days: [true, true, true, true, true, true, true], skipIfLogged: true },
+};
+const EMPTY_TOTALS: MealTotals = { calories: 0, protein: 0, carbs: 0, fat: 0 };
+
+function round(value: number) {
+  return Math.round(value);
+}
+
+function caloriesFromMacros(protein: number, carbs: number, fat: number) {
+  return 4 * protein + 4 * carbs + 9 * fat;
+}
+
+function calculateFood(food: Food, grams: number): MealTotals {
+  const portion = grams / 100;
+  const protein = food.protein * portion;
+  const carbs = food.carbs * portion;
+  const fat = food.fat * portion;
+  return { calories: round(caloriesFromMacros(protein, carbs, fat)), protein, carbs, fat };
+}
+
+function normalizeSearch(value: string) {
+  return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
+}
+
+function mealForCurrentHour(): MealType {
+  const hour = new Date().getHours();
+  if (hour < 10) return 'breakfast';
+  if (hour < 14) return 'lunch';
+  if (hour < 17) return 'snack';
+  return 'dinner';
+}
+
+function defaultReminderState(): Record<MealKey, Reminder> {
+  return Object.fromEntries(
+    Object.entries(DEFAULT_REMINDERS).map(([key, reminder]) => [key, { ...reminder, days: [...reminder.days] }]),
+  ) as Record<MealKey, Reminder>;
+}
+
+function parseStoredReminders(value: string | null): Record<MealKey, Reminder> {
+  if (!value) return defaultReminderState();
+  try {
+    const parsed = JSON.parse(value) as Partial<Record<MealKey, Partial<Reminder>>>;
+    const defaults = defaultReminderState();
+    return Object.fromEntries(
+      (Object.keys(defaults) as MealKey[]).map(key => {
+        const stored = parsed[key];
+        return [key, {
+          ...defaults[key],
+          ...stored,
+          days: Array.isArray(stored?.days) && stored.days.length === 7
+            ? stored.days.map(Boolean)
+            : defaults[key].days,
+        }];
+      }),
+    ) as Record<MealKey, Reminder>;
+  } catch {
+    return defaultReminderState();
+  }
+}
+
+function initialDraft(food: Food | null, source: Draft['source'] = 'manual'): Draft {
+  return {
+    food,
+    custom: !food,
+    name: food?.name ?? '',
+    mealType: mealForCurrentHour(),
+    grams: food ? food.portions[food.defaultPortion].grams : 0,
+    values: { calories: '', protein: '', carbs: '', fat: '' },
+    source,
+    candidates: [],
+    confirmDelete: false,
+  };
+}
+
+function draftFromMeal(meal: Meal): Draft {
+  const portionMatch = meal.food_name.match(/^(.*) · (\d+)g$/);
+  const baseName = portionMatch?.[1] ?? meal.food_name;
+  const food = FOODS.find(item => item.name === baseName) ?? null;
+  if (food && portionMatch) {
+    return {
+      ...initialDraft(food),
+      editId: meal.id,
+      source: 'edit',
+      mealType: meal.meal_type,
+      grams: Number(portionMatch[2]),
+    };
+  }
+  return {
+    ...initialDraft(null),
+    editId: meal.id,
+    source: 'edit',
+    custom: true,
+    name: meal.food_name,
+    mealType: meal.meal_type,
+    values: {
+      calories: String(meal.calories ?? ''),
+      protein: String(meal.protein ?? ''),
+      carbs: String(meal.carbs ?? ''),
+      fat: String(meal.fat ?? ''),
+    },
+  };
+}
+
+function portionLabel(food: Food, grams: number) {
+  const portion = food.portions.find(item => item.grams === grams);
+  return portion ? `${portion.label} · ${grams}g` : `${grams}g`;
+}
+
+function repeatDescription(days: boolean[]) {
+  const selected = days.map((enabled, index) => enabled ? index : -1).filter(index => index >= 0);
+  if (selected.length === 7) return 'Hàng ngày';
+  if (selected.join(',') === '0,1,2,3,4') return 'T2–T6';
+  if (selected.join(',') === '5,6') return 'Cuối tuần';
+  if (selected.length === 0) return 'Chưa chọn ngày';
+  return selected.map(index => WEEKDAYS[index]).join(', ');
+}
+
+function shiftedTime(time: string, lead: number) {
+  if (!time) return '--:--';
+  const [hours, minutes] = time.split(':').map(Number);
+  const total = (hours * 60 + minutes - lead + 1440) % 1440;
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+}
 
 export function NutritionScreen() {
-  const { user, meals, profile, refreshMeals, theme } = useApp();
-  const displayMeals = meals;
-
-  const [showAdd, setShowAdd] = useState(false);
-  const [inputMethod, setInputMethod] = useState<'camera' | 'library' | 'manual' | null>(null);
-  const [form, setForm] = useState({ food_name: '', calories: '', protein: '', carbs: '', fat: '', meal_type: 'lunch' as any });
+  const { user, meals, profile, refreshMeals } = useApp();
+  const [sheetView, setSheetView] = useState<SheetView | null>(null);
+  const [draft, setDraft] = useState<Draft | null>(null);
+  const [query, setQuery] = useState('');
+  const [reminders, setReminders] = useState<Record<MealKey, Reminder>>(defaultReminderState);
+  const [reminderDraft, setReminderDraft] = useState<ReminderDraft | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const cameraInput = useRef<HTMLInputElement>(null);
+  const libraryInput = useRef<HTMLInputElement>(null);
+  const photoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const targetCal = profile?.tdee || 2000;
-  const totalCal = displayMeals.reduce((s, m) => s + (m.calories || 0), 0);
-  const totalProtein = displayMeals.reduce((s, m) => s + (m.protein || 0), 0);
-  const totalCarbs = displayMeals.reduce((s, m) => s + (m.carbs || 0), 0);
-  const totalFat = displayMeals.reduce((s, m) => s + (m.fat || 0), 0);
-  const calPercent = Math.min(100, (totalCal / targetCal) * 100);
+  const calorieGoal = profile?.tdee && profile.tdee > 0 ? profile.tdee : CALORIE_GOAL_FALLBACK;
+  const macroGoals = {
+    protein: round(calorieGoal * MACRO_SPLIT.protein / 4),
+    carbs: round(calorieGoal * MACRO_SPLIT.carbs / 4),
+    fat: round(calorieGoal * MACRO_SPLIT.fat / 9),
+  };
+  const totals = useMemo(
+    () => meals.reduce<MealTotals>((sum, meal) => ({
+      calories: sum.calories + (meal.calories || 0),
+      protein: sum.protein + (meal.protein || 0),
+      carbs: sum.carbs + (meal.carbs || 0),
+      fat: sum.fat + (meal.fat || 0),
+    }), EMPTY_TOTALS),
+    [meals],
+  );
+  const sortedMeals = useMemo(
+    () => [...meals].sort((a, b) =>
+      MEAL_TYPE_ORDER[a.meal_type] - MEAL_TYPE_ORDER[b.meal_type]
+      || new Date(a.eaten_at).getTime() - new Date(b.eaten_at).getTime()),
+    [meals],
+  );
+  const filteredFoods = useMemo(() => {
+    const search = normalizeSearch(query.trim());
+    return FOODS.filter(food => !search || normalizeSearch(food.name).includes(search));
+  }, [query]);
+  const progress = Math.min(1, totals.calories / calorieGoal);
+  const radius = 56;
+  const circumference = 2 * Math.PI * radius;
+  const dashOffset = circumference * (1 - progress);
 
-  const mealIcons: Record<string, string> = { breakfast: '🌅', lunch: '☀️', dinner: '🌙', snack: '🍎' };
-  const mealLabels: Record<string, string> = { breakfast: 'Bữa sáng', lunch: 'Bữa trưa', dinner: 'Bữa chiều', snack: 'Bữa phụ' };
+  const draftTotals = useMemo(() => {
+    if (!draft) return EMPTY_TOTALS;
+    if (!draft.custom && draft.food) return calculateFood(draft.food, draft.grams);
+    const protein = Number(draft.values.protein) || 0;
+    const carbs = Number(draft.values.carbs) || 0;
+    const fat = Number(draft.values.fat) || 0;
+    const calories = draft.values.calories.trim()
+      ? Math.max(0, round(Number(draft.values.calories) || 0))
+      : round(caloriesFromMacros(protein, carbs, fat));
+    return { calories, protein, carbs, fat };
+  }, [draft]);
 
-  async function addMeal() {
-    if (!form.food_name || !form.calories) return;
-    setLoading(true);
-    if (user) {
-      await supabase.from('meals').insert({
-        user_id: user.id,
-        food_name: form.food_name,
-        calories: parseInt(form.calories),
-        protein: parseFloat(form.protein) || 0,
-        carbs: parseFloat(form.carbs) || 0,
-        fat: parseFloat(form.fat) || 0,
-        meal_type: form.meal_type,
-        eaten_at: new Date().toISOString(),
-      });
-      await refreshMeals();
+  const advice = useMemo(() => {
+    const ratio = totals.calories / calorieGoal;
+    if (meals.length === 0) return 'Hôm nay bạn chưa ghi bữa nào. Bấm Thêm để ghi bữa đầu tiên.';
+    if (ratio > 1) return 'Bạn đã vượt mục tiêu calo hôm nay. Bữa tiếp theo nên chọn món nhẹ hơn.';
+    if (totals.protein / macroGoals.protein < ratio - 0.15) {
+      return 'Bạn đang thiếu chất đạm so với lượng calo đã nạp. Thử thêm trứng, thịt gà hoặc đậu phụ.';
     }
-    setForm({ food_name: '', calories: '', protein: '', carbs: '', fat: '', meal_type: 'lunch' });
-    setInputMethod(null);
-    setShowAdd(false);
-    setLoading(false);
+    if (totals.fat / macroGoals.fat > ratio + 0.2) {
+      return 'Lượng chất béo đang hơi cao so với calo đã nạp. Bữa sau nên chọn món ít dầu mỡ.';
+    }
+    return 'Tuyệt vời! Chế độ ăn của bạn khá cân bằng hôm nay.';
+  }, [calorieGoal, macroGoals.fat, macroGoals.protein, meals.length, totals]);
+
+  useEffect(() => {
+    setReminders(parseStoredReminders(window.localStorage.getItem('goclock-nutrition-reminders')));
+  }, []);
+
+  useEffect(() => () => {
+    if (photoTimer.current) clearTimeout(photoTimer.current);
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+  }, [imagePreview]);
+
+  useEffect(() => {
+    if (!sheetView) return;
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key !== 'Escape' || loading) return;
+      if (photoTimer.current) clearTimeout(photoTimer.current);
+      if (imagePreview) URL.revokeObjectURL(imagePreview);
+      setImagePreview(null);
+      setSheetView(null);
+      setDraft(null);
+      setReminderDraft(null);
+      setError('');
+    }
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [imagePreview, loading, sheetView]);
+
+  function clearPreview() {
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setImagePreview(null);
   }
 
-  function getAdvice() {
-    const ratio = totalCal / targetCal;
-    if (ratio < 0.4) return { text: 'Bạn đang thiếu calo! Hãy ăn thêm để đủ năng lượng.', color: '#e65100', bg: '#fff3e0' };
-    if (ratio > 1.1) return { text: 'Bạn đã vượt calo mục tiêu. Hãy chú ý lượng ăn nhé!', color: '#d93025', bg: '#fce8e6' };
-    if (totalProtein < 50) return { text: 'Lượng protein còn thấp. Bổ sung thêm thịt, trứng, đậu.', color: '#1967d2', bg: '#e8f0fe' };
-    return { text: 'Tuyệt vời! Chế độ ăn của bạn khá cân bằng hôm nay.', color: '#137333', bg: '#e6f4ea' };
+  function openMenu() {
+    setError('');
+    setQuery('');
+    setDraft(null);
+    setReminderDraft(null);
+    setSheetView('menu');
   }
 
-  const advice = getAdvice();
+  function closeSheet() {
+    if (loading) return;
+    if (photoTimer.current) clearTimeout(photoTimer.current);
+    clearPreview();
+    setSheetView(null);
+    setDraft(null);
+    setReminderDraft(null);
+    setError('');
+  }
 
-  const circumference = 2 * Math.PI * 52;
-  const dashOffset = circumference - (calPercent / 100) * circumference;
+  function openFood(food: Food) {
+    setDraft(initialDraft(food));
+    setSheetView('confirm');
+    setError('');
+  }
+
+  function openCustom(name = '') {
+    const next = initialDraft(null);
+    next.name = name;
+    setDraft(next);
+    setSheetView('confirm');
+    setError('');
+  }
+
+  function openMeal(meal: Meal) {
+    setDraft(draftFromMeal(meal));
+    setSheetView('confirm');
+    setError('');
+  }
+
+  function updateDraft(patch: Partial<Draft>) {
+    setDraft(current => current ? { ...current, ...patch } : current);
+  }
+
+  function updateCustomValue(key: keyof MacroValues, value: string) {
+    setDraft(current => current
+      ? { ...current, values: { ...current.values, [key]: value } }
+      : current);
+  }
+
+  function handleBack() {
+    if (sheetView === 'confirm' && draft?.source === 'manual') {
+      setSheetView('search');
+      return;
+    }
+    setSheetView('menu');
+    setDraft(null);
+    setError('');
+  }
+
+  function handlePhotoSelected(file?: File) {
+    if (!file) return;
+    clearPreview();
+    const preview = URL.createObjectURL(file);
+    setImagePreview(preview);
+    const next = initialDraft(null, 'photo');
+    next.imagePreview = preview;
+    setDraft(next);
+    setSheetView('confirm');
+    setError('');
+  }
+
+  function editReminder(meal: MealKey) {
+    setReminderDraft({
+      meal,
+      value: { ...reminders[meal], days: [...reminders[meal].days] },
+    });
+    setSheetView('remind');
+    setError('');
+  }
+
+  function saveReminder() {
+    if (!reminderDraft) return;
+    const { meal, value } = reminderDraft;
+    if (value.enabled && (!value.time || !value.days.some(Boolean))) {
+      setError(!value.time ? 'Hãy chọn giờ ăn.' : 'Hãy chọn ít nhất một ngày để nhận thông báo.');
+      return;
+    }
+    const next = { ...reminders, [meal]: value };
+    try {
+      window.localStorage.setItem('goclock-nutrition-reminders', JSON.stringify(next));
+    } catch (storageError) {
+      console.error('Unable to save nutrition reminders:', storageError);
+      setError('Không thể lưu thiết lập lời nhắc trên thiết bị này.');
+      return;
+    }
+    setReminders(next);
+    setSheetView(null);
+    setReminderDraft(null);
+    setError('');
+  }
+
+  function updateReminder(patch: Partial<Reminder>) {
+    setReminderDraft(current => current
+      ? { ...current, value: { ...current.value, ...patch } }
+      : current);
+    setError('');
+  }
+
+  async function saveMeal() {
+    if (!draft) return;
+    const name = draft.custom ? draft.name.trim() : draft.food?.name.trim() ?? '';
+    if (!name) {
+      setError('Vui lòng nhập tên món ăn.');
+      return;
+    }
+    if (draftTotals.calories <= 0) {
+      setError('Calo phải lớn hơn 0. Hãy nhập calo hoặc các chất dinh dưỡng.');
+      return;
+    }
+    if (!user) {
+      setError('Bạn cần đăng nhập để lưu bữa ăn.');
+      return;
+    }
+
+    const foodName = !draft.custom && draft.food
+      ? `${draft.food.name} · ${draft.grams}g`
+      : name;
+    const existingMeal = draft.editId ? meals.find(meal => meal.id === draft.editId) : undefined;
+    const payload = {
+      food_name: foodName,
+      calories: draftTotals.calories,
+      protein: Number(draftTotals.protein.toFixed(2)),
+      carbs: Number(draftTotals.carbs.toFixed(2)),
+      fat: Number(draftTotals.fat.toFixed(2)),
+      meal_type: draft.mealType,
+      eaten_at: existingMeal?.eaten_at ?? new Date().toISOString(),
+    };
+
+    setLoading(true);
+    setError('');
+    try {
+      if (draft.editId) {
+        const { data, error: saveError } = await supabase
+          .from('meals')
+          .update(payload)
+          .eq('id', draft.editId)
+          .eq('user_id', user.id)
+          .select('id')
+          .maybeSingle();
+        if (saveError) throw saveError;
+        if (!data) throw new Error('Không tìm thấy bữa ăn cần cập nhật.');
+      } else {
+        const { error: saveError } = await supabase
+          .from('meals')
+          .insert({ ...payload, user_id: user.id });
+        if (saveError) throw saveError;
+      }
+      await refreshMeals();
+      clearPreview();
+      setSheetView(null);
+      setDraft(null);
+    } catch (saveError) {
+      console.error('Unable to save meal:', saveError);
+      setError('Không thể lưu bữa ăn. Vui lòng thử lại.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function deleteMeal() {
+    if (!draft?.editId || !user) return;
+    if (!draft.confirmDelete) {
+      updateDraft({ confirmDelete: true });
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      const { data, error: deleteError } = await supabase
+        .from('meals')
+        .delete()
+        .eq('id', draft.editId)
+        .eq('user_id', user.id)
+        .select('id')
+        .maybeSingle();
+      if (deleteError) throw deleteError;
+      if (!data) throw new Error('Không tìm thấy bữa ăn cần xóa.');
+      await refreshMeals();
+      closeSheet();
+    } catch (deleteError) {
+      console.error('Unable to delete meal:', deleteError);
+      setError('Không thể xóa bữa ăn. Vui lòng thử lại.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const dateLabel = new Date().toLocaleDateString('vi-VN', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  });
 
   return (
-    <div className="flex flex-col h-full" style={{ background: theme === 'dark' ? '#0d1f12' : '#f0f7f2' }}>
-      {/* Header */}
-      <div className="px-5 safe-pt pb-4" style={{ background: 'linear-gradient(160deg, #0f2a1a 0%, #173325 100%)' }}>
-        <div className="flex items-center justify-between mb-4">
+    <div className={styles.screen}>
+      <header className={styles.header}>
+        <div className={styles.headingRow}>
           <div>
-            <h1 className="text-xl font-bold text-white">Dinh dưỡng</h1>
-            <p className="text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>
-              {new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long' })}
-            </p>
+            <h1>Dinh dưỡng</h1>
+            <p>{dateLabel}</p>
           </div>
-          <button onClick={() => setShowAdd(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl font-medium text-sm"
-            style={{ background: 'rgba(148,212,0,0.15)', color: '#94d400', border: '1px solid rgba(148,212,0,0.3)' }}>
-            <Plus size={16} /> Thêm
+          <button type="button" className={styles.addButton} onClick={openMenu}>
+            <Plus size={17} /> Thêm
           </button>
         </div>
 
-        {/* Calorie ring + macros */}
-        <div className="flex items-center gap-4">
-          <div className="relative w-32 h-32 flex-shrink-0">
-            <svg width="128" height="128" className="circle-progress">
-              <circle cx="64" cy="64" r="52" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="10" />
-              <circle cx="64" cy="64" r="52" fill="none" stroke="#94d400" strokeWidth="10"
-                strokeDasharray={circumference} strokeDashoffset={dashOffset}
-                strokeLinecap="round" style={{ transition: 'stroke-dashoffset 0.8s ease' }} />
+        <div className={styles.summary}>
+          <div className={`${styles.ring} ${totals.calories > calorieGoal ? styles.ringOver : ''}`}>
+            <svg viewBox="0 0 132 132" aria-hidden="true">
+              <circle className={styles.ringTrack} cx="66" cy="66" r={radius} />
+              <circle
+                className={styles.ringProgress}
+                cx="66"
+                cy="66"
+                r={radius}
+                strokeDasharray={circumference}
+                strokeDashoffset={dashOffset}
+              />
             </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="font-bold text-xl text-white">{totalCal}</span>
-              <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.5)' }}>/ {targetCal}</span>
-              <span className="text-[10px]" style={{ color: '#94d400' }}>kcal</span>
+            <div className={styles.ringContent}>
+              <strong>{round(totals.calories).toLocaleString('vi-VN')}</strong>
+              <small>/ {round(calorieGoal).toLocaleString('vi-VN')} kcal</small>
+              <span>
+                {totals.calories <= calorieGoal
+                  ? `Còn ${round(calorieGoal - totals.calories)} kcal`
+                  : `Vượt ${round(totals.calories - calorieGoal)} kcal`}
+              </span>
             </div>
           </div>
 
-          <div className="flex-1 grid grid-cols-1 gap-2">
-            {[
-              { icon: <Beef size={14} />, label: 'Protein', val: `${Math.round(totalProtein)}g`, target: '60g', color: '#ef4444' },
-              { icon: <Wheat size={14} />, label: 'Carbs', val: `${Math.round(totalCarbs)}g`, target: '250g', color: '#f59e0b' },
-              { icon: <Droplets size={14} />, label: 'Fat', val: `${Math.round(totalFat)}g`, target: '65g', color: '#3b82f6' },
-            ].map(m => (
-              <div key={m.label} className="flex items-center gap-2 rounded-xl px-3 py-2" style={{ background: 'rgba(255,255,255,0.08)' }}>
-                <div style={{ color: m.color }}>{m.icon}</div>
-                <span className="text-xs flex-1" style={{ color: 'rgba(255,255,255,0.6)' }}>{m.label}</span>
-                <span className="text-xs font-bold text-white">{m.val}</span>
-                <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.35)' }}>/{m.target}</span>
+          <div className={styles.macros}>
+            {([
+              { key: 'protein', label: 'Chất đạm', color: '#ff7a6b', value: totals.protein, goal: macroGoals.protein },
+              { key: 'carbs', label: 'Tinh bột', color: '#ffb347', value: totals.carbs, goal: macroGoals.carbs },
+              { key: 'fat', label: 'Chất béo', color: '#5ab0ff', value: totals.fat, goal: macroGoals.fat },
+            ] as const).map(item => (
+              <div className={styles.macro} key={item.key}>
+                <div className={styles.macroRow}>
+                  <i style={{ backgroundColor: item.color }} />
+                  <span>{item.label}</span>
+                  <strong>{round(item.value)}g <small>/ {item.goal}g</small></strong>
+                </div>
+                <div className={styles.macroTrack}>
+                  <i
+                    style={{
+                      width: `${Math.min(100, item.value / item.goal * 100)}%`,
+                      backgroundColor: item.color,
+                    }}
+                  />
+                </div>
               </div>
             ))}
           </div>
         </div>
-      </div>
+      </header>
 
-      <div className="flex-1 overflow-y-auto scroll-content px-4 pt-4 pb-6">
-        {/* Advice */}
-        <div className="rounded-2xl p-3 mb-4 flex items-start gap-2" style={{ background: advice.bg, border: `1px solid ${advice.color}30` }}>
-          <Info size={14} style={{ color: advice.color, flexShrink: 0, marginTop: 1 }} />
-          <p className="text-xs font-medium leading-relaxed" style={{ color: advice.color }}>{advice.text}</p>
+      <main className={styles.content}>
+        <div className={styles.advice}>
+          <Info size={17} />
+          <span>{advice}</span>
         </div>
 
-        {/* Meals list */}
-        <h3 className="font-semibold text-sm mb-3" style={{ color: theme === 'dark' ? '#94d400' : '#173325' }}>Bữa ăn hôm nay</h3>
-        <div className="flex flex-col gap-2 mb-4">
-          {displayMeals.length === 0 ? (
-            <div className="rounded-2xl p-6 text-center shadow-sm flex flex-col items-center"
-              style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.05)' : '#fff', border: theme === 'dark' ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(23,51,37,0.08)' }}>
-              <span className="text-3xl mb-2">🥗</span>
-              <p className="font-bold text-sm" style={{ color: theme === 'dark' ? '#fff' : '#202124' }}>Chưa ghi nhận bữa ăn nào</p>
-              <p className="text-xs text-gray-400 mt-1 mb-3">Nhấn "+ Thêm món" để theo dõi calo thực tế hôm nay</p>
+        <h2 className={styles.sectionTitle}>Bữa ăn hôm nay</h2>
+        {sortedMeals.length === 0 ? (
+          <div className={styles.empty}>
+            <span>🥗</span>
+            <strong>Chưa có bữa ăn nào.</strong>
+            <p>Thêm món ăn để theo dõi lượng calo và dinh dưỡng hôm nay.</p>
+            <button type="button" onClick={openMenu}>+ Ghi nhận bữa ăn</button>
+          </div>
+        ) : (
+          sortedMeals.map(meal => {
+            const item = MEAL_TYPES.find(type => type.key === meal.meal_type);
+            const portion = meal.food_name.match(/ · (\d+g)$/)?.[1];
+            const title = portion ? meal.food_name.replace(/ · \d+g$/, '') : meal.food_name;
+            return (
               <button
-                onClick={() => setShowAdd(true)}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-[#0d2215] bg-[#94d400] transition-transform active:scale-95"
+                type="button"
+                className={styles.mealCard}
+                key={meal.id}
+                onClick={() => openMeal(meal)}
+                aria-label={`Sửa ${title}`}
               >
-                + Ghi nhận bữa ăn
+                <span className={styles.mealEmoji}>{item?.emoji ?? '🍽️'}</span>
+                <span className={styles.mealDetails}>
+                  <strong>{title}</strong>
+                  <span className={styles.mealMeta}>
+                    <i>{item?.label ?? 'Bữa ăn'}</i>
+                    <span>{portion ?? new Date(meal.eaten_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</span>
+                  </span>
+                  <span className={styles.mealMacros}>
+                    Đạm <b>{round(meal.protein)}g</b> · Tinh bột <b>{round(meal.carbs)}g</b> · Béo <b>{round(meal.fat)}g</b>
+                  </span>
+                </span>
+                <strong className={styles.mealCalories}>{round(meal.calories)} <small>kcal</small></strong>
+              </button>
+            );
+          })
+        )}
+
+        <section className={styles.schedule}>
+          <h2 className={styles.sectionTitle}>Lịch ăn gợi ý hôm nay</h2>
+          <p className={styles.scheduleHint}>Chạm vào từng bữa để chỉnh giờ và thiết lập lời nhắc.</p>
+          {MEAL_TYPES.map(meal => {
+            const key = meal.key;
+            const reminder = reminders[key];
+            return (
+              <button
+                type="button"
+                className={styles.scheduleRow}
+                key={meal.key}
+                onClick={() => editReminder(key)}
+                aria-label={`Chỉnh lời nhắc ${meal.label}`}
+              >
+                <strong>{meal.label}</strong>
+                <span>{round(calorieGoal * MEAL_SHARES[key])} kcal gợi ý · {reminder.enabled ? repeatDescription(reminder.days) : 'Đã tắt'}</span>
+                <em className={reminder.enabled ? '' : styles.reminderOff}>
+                  <Bell size={15} />
+                  {reminder.time.replace(/^0/, '')}
+                  <ChevronRight size={15} />
+                </em>
+              </button>
+            );
+          })}
+        </section>
+      </main>
+
+      {sheetView && (
+        <div className={styles.overlay} onClick={closeSheet}>
+          <section
+            className={`${styles.sheet} ${sheetView === 'remind' ? styles.reminderSheet : ''}`}
+            role="dialog"
+            aria-modal="true"
+            aria-label={sheetView === 'remind' ? 'Thiết lập lời nhắc' : 'Thêm bữa ăn'}
+            onClick={event => event.stopPropagation()}
+          >
+            <div className={styles.grab} />
+            <div className={styles.sheetHeader}>
+              {sheetView !== 'menu' && (
+                <button type="button" className={styles.roundButton} onClick={handleBack} aria-label="Quay lại">
+                  <ArrowLeft size={18} />
+                </button>
+              )}
+              <h2>
+                {sheetView === 'menu' && 'Thêm bữa ăn'}
+                {sheetView === 'search' && 'Tìm món ăn'}
+                {sheetView === 'confirm' && (draft?.editId ? 'Sửa bữa ăn' : 'Xác nhận món ăn')}
+                {sheetView === 'remind' && `Lời nhắc ${reminderDraft ? MEAL_NAMES[reminderDraft.meal] : ''}`}
+              </h2>
+              <button type="button" className={styles.roundButton} onClick={closeSheet} aria-label="Đóng">
+                <X size={18} />
               </button>
             </div>
-          ) : (
-            displayMeals.map((meal: any) => (
-              <div key={meal.id} className="rounded-2xl p-3.5 shadow-sm" style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.05)' : '#fff', border: theme === 'dark' ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(23,51,37,0.08)' }}>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0" style={{ background: theme === 'dark' ? 'rgba(148,212,0,0.15)' : '#f0f7f2' }}>
-                    {mealIcons[meal.meal_type] || '🍽️'}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-0.5">
-                      <p className="font-semibold text-sm truncate" style={{ color: theme === 'dark' ? '#fff' : '#202124' }}>{meal.food_name}</p>
-                      <span className="font-bold text-sm ml-2 flex-shrink-0" style={{ color: theme === 'dark' ? '#94d400' : '#173325' }}>{meal.calories} kcal</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: theme === 'dark' ? 'rgba(148,212,0,0.15)' : '#f0f7f2', color: theme === 'dark' ? '#94d400' : '#173325' }}>
-                        {mealLabels[meal.meal_type]}
-                      </span>
-                      <span className="text-[10px]" style={{ color: theme === 'dark' ? 'rgba(255,255,255,0.5)' : '#9aa0a6' }}>
-                        P: {Math.round(meal.protein)}g · C: {Math.round(meal.carbs)}g · F: {Math.round(meal.fat)}g
-                      </span>
-                    </div>
-                  </div>
+
+            {sheetView === 'menu' && (
+              <div className={styles.sheetBody}>
+                <p className={styles.lead}>Chọn cách ghi nhận bữa ăn:</p>
+                <button type="button" className={`${styles.methodCard} ${styles.methodPhoto}`} onClick={() => cameraInput.current?.click()}>
+                  <span><Camera size={25} /></span>
+                  <i><strong>Chụp ảnh</strong><small>Chọn ảnh món ăn để nhập thông tin</small></i>
+                  <ChevronRight size={18} />
+                </button>
+                <button type="button" className={`${styles.methodCard} ${styles.methodLibrary}`} onClick={() => libraryInput.current?.click()}>
+                  <span><ImageIcon size={25} /></span>
+                  <i><strong>Thư viện ảnh</strong><small>Chọn ảnh từ thiết bị</small></i>
+                  <ChevronRight size={18} />
+                </button>
+                <button type="button" className={`${styles.methodCard} ${styles.methodManual}`} onClick={() => { setQuery(''); setSheetView('search'); }}>
+                  <span><PenLine size={25} /></span>
+                  <i><strong>Nhập tay</strong><small>Tìm món có sẵn hoặc tự nhập dinh dưỡng</small></i>
+                  <ChevronRight size={18} />
+                </button>
+                <p className={styles.photoNote}>Nhận diện món ăn tự động chưa được tích hợp; ảnh chỉ dùng để tham khảo khi nhập món.</p>
+              </div>
+            )}
+
+            {sheetView === 'search' && (
+              <div className={styles.sheetBody}>
+                <label className={styles.searchBox}>
+                  <Search size={18} />
+                  <input
+                    autoFocus
+                    value={query}
+                    onChange={event => setQuery(event.target.value)}
+                    placeholder="Tìm phở, cơm, rau..."
+                  />
+                </label>
+                <div className={styles.foodList}>
+                  {filteredFoods.map(food => {
+                    const defaultPortion = food.portions[food.defaultPortion];
+                    const nutrition = calculateFood(food, 100);
+                    return (
+                      <button type="button" className={styles.foodRow} key={food.id} onClick={() => openFood(food)}>
+                        <span className={styles.foodEmoji}>{food.emoji}</span>
+                        <span><strong>{food.name}</strong><small>{defaultPortion.label} · {defaultPortion.grams}g</small></span>
+                        <em>{nutrition.calories} kcal/100g</em>
+                      </button>
+                    );
+                  })}
                 </div>
-              </div>
-            ))
-          )}
-        </div>
-
-        {/* Meal schedule reminder */}
-        <div className="rounded-2xl p-4 mb-4" style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.05)' : '#fff', border: theme === 'dark' ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(23,51,37,0.08)' }}>
-          <h4 className="font-semibold text-sm mb-3 flex items-center gap-2" style={{ color: theme === 'dark' ? '#94d400' : '#173325' }}>
-            <Clock size={14} /> Lịch ăn gợi ý hôm nay
-          </h4>
-          {[
-            { type: 'Bữa sáng', time: '7:00', icon: '🌅', cal: Math.round(targetCal * 0.3) },
-            { type: 'Bữa trưa', time: '12:00', icon: '☀️', cal: Math.round(targetCal * 0.4) },
-            { type: 'Bữa chiều', time: '18:00', icon: '🌙', cal: Math.round(targetCal * 0.3) },
-          ].map((b, i) => (
-            <div key={i} className="flex items-center gap-3 py-2" style={{ borderBottom: i < 2 ? `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.08)' : '#f5f5f5'}` : 'none' }}>
-              <span className="text-lg">{b.icon}</span>
-              <div className="flex-1">
-                <p className="text-sm font-medium" style={{ color: theme === 'dark' ? '#fff' : '#202124' }}>{b.type}</p>
-                <p className="text-xs" style={{ color: theme === 'dark' ? 'rgba(255,255,255,0.5)' : '#9aa0a6' }}>{b.cal} kcal gợi ý</p>
-              </div>
-              <span className="text-xs font-medium" style={{ color: theme === 'dark' ? '#94d400' : '#173325' }}>{b.time}</span>
-            </div>
-          ))}
-        </div>
-        <div className="h-4" />
-      </div>
-
-      {/* Add modal */}
-      {showAdd && (
-        <div className="absolute inset-0 z-50 flex items-end" style={{ background: 'rgba(0,0,0,0.5)' }} onClick={() => { setShowAdd(false); setInputMethod(null); }}>
-          <div className="bottom-sheet w-full max-h-[85%] flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="drag-handle" />
-            <div className="flex items-center justify-between px-5 pt-3 pb-3">
-              <h3 className="font-bold text-lg" style={{ color: theme === 'dark' ? '#94d400' : '#173325' }}>Thêm bữa ăn</h3>
-              <button onClick={() => { setShowAdd(false); setInputMethod(null); }} className="p-2 rounded-full" style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f5f5f5' }}>
-                <X size={18} className="text-gray-500" />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto scroll-content px-5 pb-2">
-              {!inputMethod ? (
-                <div className="flex flex-col gap-3">
-                  <p className="text-sm mb-1" style={{ color: theme === 'dark' ? 'rgba(255,255,255,0.5)' : '#5f6368' }}>Chọn phương thức nhập:</p>
-                  {[
-                    { key: 'camera', icon: <Camera size={28} />, label: 'Chụp ảnh', desc: 'AI nhận diện món ăn & tính dinh dưỡng', color: '#8E3114', bg: theme === 'dark' ? 'rgba(142,49,20,0.15)' : '#fdf3ee' },
-                    { key: 'library', icon: <Image size={28} />, label: 'Thư viện ảnh', desc: 'Chọn ảnh từ thiết bị', color: '#1967d2', bg: theme === 'dark' ? 'rgba(25,103,210,0.15)' : '#e8f0fe' },
-                    { key: 'manual', icon: <PenLine size={28} />, label: 'Nhập tay', desc: 'Nhập tên món ăn và calo', color: '#137333', bg: theme === 'dark' ? 'rgba(19,115,51,0.15)' : '#e6f4ea' },
-                  ].map(m => (
-                    <button key={m.key} onClick={() => setInputMethod(m.key as any)}
-                      className="flex items-center gap-4 p-4 rounded-2xl text-left transition-all active:scale-98"
-                      style={{ background: m.bg, border: `1px solid ${m.color}20` }}>
-                      <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0"
-                        style={{ background: `${m.color}15`, color: m.color }}>
-                        {m.icon}
-                      </div>
-                      <div>
-                        <p className="font-semibold text-base" style={{ color: m.color }}>{m.label}</p>
-                        <p className="text-xs mt-0.5" style={{ color: `${m.color}99` }}>{m.desc}</p>
-                      </div>
-                      <ChevronRight size={18} style={{ color: m.color, marginLeft: 'auto' }} />
+                {(filteredFoods.length === 0 || query.trim()) && (
+                  <div className={styles.customPrompt}>
+                    <span>{filteredFoods.length ? 'Không có đúng món bạn cần?' : `Không tìm thấy “${query.trim()}”.`}</span>
+                    <p>Bạn có thể tự nhập calo và các chất dinh dưỡng.</p>
+                    <button type="button" onClick={() => openCustom(query.trim())}>
+                      Nhập thủ công{query.trim() ? ` “${query.trim()}”` : ''}
                     </button>
-                  ))}
-                </div>
-              ) : inputMethod === 'manual' ? (
-                <div className="flex flex-col gap-3">
-                  <button onClick={() => setInputMethod(null)} className="flex items-center gap-1 text-sm mb-1" style={{ color: theme === 'dark' ? '#94d400' : '#173325' }}>
-                    ← Quay lại
-                  </button>
-                  <div>
-                    <label className="text-xs font-semibold mb-1.5 block" style={{ color: theme === 'dark' ? '#94d400' : '#173325' }}>Tên món ăn *</label>
-                    <input type="text" value={form.food_name} onChange={e => setForm(p => ({ ...p, food_name: e.target.value }))}
-                      placeholder="VD: Cơm gà, Phở bò..." className="w-full px-4 py-3 rounded-xl border text-sm outline-none"
-                      style={{ borderColor: theme === 'dark' ? 'rgba(255,255,255,0.2)' : '#d1e8d8', color: theme === 'dark' ? '#fff' : '#202124', background: theme === 'dark' ? 'rgba(255,255,255,0.05)' : '#fff' }} />
                   </div>
-                  <div>
-                    <label className="text-xs font-semibold mb-1.5 block" style={{ color: theme === 'dark' ? '#94d400' : '#173325' }}>Bữa ăn</label>
-                    <div className="grid grid-cols-4 gap-2">
-                      {Object.entries(mealLabels).map(([k, v]) => (
-                        <button key={k} onClick={() => setForm(p => ({ ...p, meal_type: k }))}
-                          className="py-2 rounded-xl text-xs font-medium transition-all"
-                          style={form.meal_type === k
-                            ? { background: '#173325', color: '#94d400' }
-                            : { background: theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f5f5f5', color: theme === 'dark' ? 'rgba(255,255,255,0.6)' : '#5f6368' }}>
-                          {mealIcons[k]} {v.replace('Bữa ', '')}
+                )}
+              </div>
+            )}
+
+            {sheetView === 'confirm' && draft && (
+              <>
+                <div className={styles.sheetBody}>
+                  {draft.source === 'photo' && (
+                    <div className={styles.photoWarning}>
+                      {draft.imagePreview && <img src={draft.imagePreview} alt="Ảnh món ăn đã chọn" />}
+                      <span>
+                        <strong>Ảnh đã được chọn</strong>
+                        <small>Ứng dụng chưa có nhận diện ảnh tự động. Hãy chọn món hoặc nhập thông tin thủ công để lưu chính xác.</small>
+                      </span>
+                    </div>
+                  )}
+
+                  {draft.custom ? (
+                    <>
+                      <label className={styles.fieldLabel} htmlFor="nutrition-name">Tên món</label>
+                      <input
+                        id="nutrition-name"
+                        className={styles.textInput}
+                        value={draft.name}
+                        onChange={event => updateDraft({ name: event.target.value })}
+                        placeholder="Ví dụ: Bánh flan nhà làm"
+                      />
+                      <p className={styles.fieldLabel}>Dinh dưỡng của cả khẩu phần</p>
+                      <div className={styles.valueGrid}>
+                        {([
+                          ['calories', 'Calo (kcal)'],
+                          ['protein', 'Chất đạm (g)'],
+                          ['carbs', 'Tinh bột (g)'],
+                          ['fat', 'Chất béo (g)'],
+                        ] as [keyof MacroValues, string][]).map(([key, label]) => (
+                          <label key={key}>
+                            <span>{label}</span>
+                            <input
+                              className={styles.textInput}
+                              type="number"
+                              min="0"
+                              step="any"
+                              value={draft.values[key]}
+                              onChange={event => updateCustomValue(key, event.target.value)}
+                              placeholder={key === 'calories' ? 'Tự tính nếu bỏ trống' : '0'}
+                            />
+                          </label>
+                        ))}
+                      </div>
+                    </>
+                  ) : draft.food ? (
+                    <>
+                      <div className={styles.dishHeading}>
+                        <span className={styles.foodEmoji}>{draft.food.emoji}</span>
+                        <strong>{draft.food.name}</strong>
+                      </div>
+                      <p className={styles.fieldLabel}>Khẩu phần</p>
+                      <div className={styles.chips}>
+                        {draft.food.portions.map(portion => (
+                          <button
+                            type="button"
+                            key={`${portion.label}-${portion.grams}`}
+                            aria-pressed={portion.grams === draft.grams}
+                            onClick={() => updateDraft({ grams: portion.grams })}
+                          >
+                            {portion.label} · {portion.grams}g
+                          </button>
+                        ))}
+                      </div>
+                      <div className={styles.gramControl}>
+                        <button type="button" onClick={() => updateDraft({ grams: Math.max(1, draft.grams - 10) })} aria-label="Giảm 10 gam">
+                          <Minus size={18} />
+                        </button>
+                        <label>
+                          <input
+                            type="number"
+                            min="1"
+                            max="2000"
+                            value={draft.grams}
+                            onChange={event => updateDraft({ grams: Math.max(1, Math.min(2000, Number(event.target.value) || 1)) })}
+                            aria-label="Khối lượng tính bằng gam"
+                          />
+                          <span>g</span>
+                        </label>
+                        <button type="button" onClick={() => updateDraft({ grams: Math.min(2000, draft.grams + 10) })} aria-label="Tăng 10 gam">
+                          <Plus size={18} />
+                        </button>
+                      </div>
+                      <input
+                        className={styles.range}
+                        type="range"
+                        min="10"
+                        max="1000"
+                        step="5"
+                        value={Math.min(1000, draft.grams)}
+                        onChange={event => updateDraft({ grams: Number(event.target.value) })}
+                        aria-label="Kéo để chỉnh khối lượng"
+                      />
+                    </>
+                  ) : null}
+
+                  <div className={styles.resultCard}>
+                    <strong>{draftTotals.calories} <small>kcal</small></strong>
+                    <div>
+                      <span>Chất đạm<b>{round(draftTotals.protein)}g</b></span>
+                      <span>Tinh bột<b>{round(draftTotals.carbs)}g</b></span>
+                      <span>Chất béo<b>{round(draftTotals.fat)}g</b></span>
+                    </div>
+                    <p>
+                      {draft.custom
+                        ? draft.values.calories.trim()
+                          ? 'Bạn đang dùng số calo tự nhập.'
+                          : 'Calo tự tính: chất đạm × 4 + tinh bột × 4 + chất béo × 9.'
+                        : `Ước tính theo khẩu phần ${draft.grams}g. Số liệu món ăn chỉ mang tính tham khảo.`}
+                    </p>
+                  </div>
+
+                  <p className={styles.fieldLabel}>Thuộc bữa nào?</p>
+                  <div className={styles.mealSegments}>
+                    {MEAL_TYPES.map(meal => (
+                      <button
+                        type="button"
+                        key={meal.key}
+                        aria-pressed={draft.mealType === meal.key}
+                        onClick={() => updateDraft({ mealType: meal.key })}
+                      >
+                        {meal.shortLabel}
+                      </button>
+                    ))}
+                  </div>
+                  {error && <p className={styles.errorMessage} role="alert">{error}</p>}
+                </div>
+                <div className={styles.sheetFooter}>
+                  {draft.editId && (
+                    <button type="button" className={styles.deleteButton} disabled={loading} onClick={deleteMeal}>
+                      <Trash2 size={16} /> {draft.confirmDelete ? 'Xác nhận xóa' : 'Xóa'}
+                    </button>
+                  )}
+                  <button type="button" className={styles.saveButton} disabled={loading} onClick={saveMeal}>
+                    {loading ? 'Đang lưu…' : draft.editId ? 'Lưu thay đổi' : 'Lưu vào hôm nay'}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {sheetView === 'remind' && reminderDraft && (
+              <>
+                <div className={styles.sheetBody}>
+                  <div className={styles.reminderRow}>
+                    <span><strong>Bật lời nhắc</strong><small>Nhắc bạn ghi nhận {MEAL_NAMES[reminderDraft.meal]}</small></span>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={reminderDraft.value.enabled}
+                      className={`${styles.switch} ${reminderDraft.value.enabled ? styles.switchOn : ''}`}
+                      onClick={() => updateReminder({ enabled: !reminderDraft.value.enabled })}
+                    />
+                  </div>
+                  <div className={!reminderDraft.value.enabled ? styles.disabledSettings : ''}>
+                    <label className={styles.fieldLabel} htmlFor="reminder-time">Giờ ăn</label>
+                    <input
+                      id="reminder-time"
+                      className={styles.textInput}
+                      type="time"
+                      value={reminderDraft.value.time}
+                      onChange={event => updateReminder({ time: event.target.value })}
+                      disabled={!reminderDraft.value.enabled}
+                    />
+                    <p className={styles.fieldLabel}>Nhắc trước</p>
+                    <div className={styles.chips}>
+                      {[[0, 'Đúng giờ'], [5, '5 phút'], [10, '10 phút'], [15, '15 phút'], [30, '30 phút']].map(([minutes, label]) => (
+                        <button
+                          type="button"
+                          key={minutes}
+                          aria-pressed={reminderDraft.value.lead === minutes}
+                          disabled={!reminderDraft.value.enabled}
+                          onClick={() => updateReminder({ lead: Number(minutes) })}
+                        >
+                          {label}
                         </button>
                       ))}
                     </div>
+                    <p className={styles.fieldLabel}>Lặp lại</p>
+                    <div className={styles.weekdays}>
+                      {WEEKDAYS.map((day, index) => (
+                        <button
+                          type="button"
+                          key={day}
+                          aria-pressed={reminderDraft.value.days[index]}
+                          disabled={!reminderDraft.value.enabled}
+                          onClick={() => {
+                            const days = [...reminderDraft.value.days];
+                            days[index] = !days[index];
+                            updateReminder({ days });
+                          }}
+                        >
+                          {day}
+                        </button>
+                      ))}
+                    </div>
+                    <div className={styles.reminderRow}>
+                      <span><strong>Bỏ qua nếu đã ghi bữa này</strong><small>Không nhắc nếu bạn đã ghi nhận bữa trước giờ nhắc</small></span>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={reminderDraft.value.skipIfLogged}
+                        className={`${styles.switch} ${reminderDraft.value.skipIfLogged ? styles.switchOn : ''}`}
+                        onClick={() => updateReminder({ skipIfLogged: !reminderDraft.value.skipIfLogged })}
+                      />
+                    </div>
+                    <div className={styles.reminderPreview}>
+                      <Clock3 size={17} />
+                      <span>
+                        {reminderDraft.value.enabled
+                          ? `Dự kiến nhắc lúc ${shiftedTime(reminderDraft.value.time, reminderDraft.value.lead)}. Lặp lại: ${repeatDescription(reminderDraft.value.days)}.`
+                          : 'Lời nhắc đang tắt.'}
+                        {' '}Đây chỉ là thiết lập trong ứng dụng; thông báo đẩy chưa được tích hợp.
+                      </span>
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-xs font-semibold mb-1.5 block" style={{ color: theme === 'dark' ? '#94d400' : '#173325' }}>Lượng calo *</label>
-                    <input type="number" value={form.calories} onChange={e => setForm(p => ({ ...p, calories: e.target.value }))}
-                      placeholder="Kcal" className="w-full px-4 py-3 rounded-xl border text-sm outline-none"
-                      style={{ borderColor: theme === 'dark' ? 'rgba(255,255,255,0.2)' : '#d1e8d8', color: theme === 'dark' ? '#fff' : '#202124', background: theme === 'dark' ? 'rgba(255,255,255,0.05)' : '#fff' }} />
-                  </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    {['protein', 'carbs', 'fat'].map(k => (
-                      <div key={k}>
-                        <label className="text-xs font-medium mb-1.5 block capitalize" style={{ color: theme === 'dark' ? 'rgba(255,255,255,0.5)' : '#9aa0a6' }}>{k} (g)</label>
-                        <input type="number" value={(form as any)[k]} onChange={e => setForm(p => ({ ...p, [k]: e.target.value }))}
-                          placeholder="0" className="w-full px-3 py-2.5 rounded-xl border text-sm outline-none"
-                          style={{ borderColor: theme === 'dark' ? 'rgba(255,255,255,0.2)' : '#d1e8d8', color: theme === 'dark' ? '#fff' : '#202124', background: theme === 'dark' ? 'rgba(255,255,255,0.05)' : '#fff' }} />
-                      </div>
-                    ))}
-                  </div>
+                  {error && <p className={styles.errorMessage} role="alert">{error}</p>}
                 </div>
-              ) : (
-                <div className="flex flex-col items-center py-8">
-                  <button onClick={() => setInputMethod(null)} className="self-start flex items-center gap-1 text-sm mb-6" style={{ color: theme === 'dark' ? '#94d400' : '#173325' }}>
-                    ← Quay lại
-                  </button>
-                  <div className="w-20 h-20 rounded-2xl flex items-center justify-center mb-4"
-                    style={{ background: theme === 'dark' ? 'rgba(25,103,210,0.15)' : '#e8f4fd', color: '#1967d2' }}>
-                    {inputMethod === 'camera' ? <Camera size={36} /> : <Image size={36} />}
-                  </div>
-                  <p className="font-semibold mb-2" style={{ color: theme === 'dark' ? '#fff' : '#202124' }}>
-                    {inputMethod === 'camera' ? 'Chụp ảnh món ăn' : 'Chọn ảnh từ thư viện'}
-                  </p>
-                  <p className="text-sm text-center mb-6" style={{ color: theme === 'dark' ? 'rgba(255,255,255,0.5)' : '#9aa0a6' }}>
-                    AI sẽ tự nhận diện món ăn và tính toán dinh dưỡng
-                  </p>
-                  <div className="rounded-2xl p-3 w-full" style={{ background: theme === 'dark' ? 'rgba(25,103,210,0.15)' : '#e8f0fe' }}>
-                    <p className="text-xs text-center" style={{ color: '#1967d2' }}>
-                      Tính năng AI nhận diện ảnh sẽ có trong phiên bản tiếp theo
-                    </p>
-                  </div>
+                <div className={styles.sheetFooter}>
+                  <button type="button" className={styles.saveButton} onClick={saveReminder}>Lưu thiết lập</button>
                 </div>
-              )}
-            </div>
-
-            {inputMethod === 'manual' && (
-              <div className="px-5 pb-8 pt-3 border-t" style={{ borderColor: '#f0f4f0' }}>
-                <button onClick={addMeal} disabled={loading}
-                  className="w-full py-4 rounded-2xl font-semibold text-base transition-all active:scale-95 disabled:opacity-60"
-                  style={{ background: 'linear-gradient(135deg, #173325 0%, #2d6a40 100%)', color: '#94d400' }}>
-                  {loading ? 'Đang lưu...' : 'Thêm bữa ăn'}
-                </button>
-              </div>
+              </>
             )}
-          </div>
+          </section>
         </div>
       )}
+
+      <input
+        ref={cameraInput}
+        className={styles.hiddenInput}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={event => {
+          handlePhotoSelected(event.target.files?.[0]);
+          event.currentTarget.value = '';
+        }}
+      />
+      <input
+        ref={libraryInput}
+        className={styles.hiddenInput}
+        type="file"
+        accept="image/*"
+        onChange={event => {
+          handlePhotoSelected(event.target.files?.[0]);
+          event.currentTarget.value = '';
+        }}
+      />
     </div>
   );
 }
