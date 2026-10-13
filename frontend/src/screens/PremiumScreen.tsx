@@ -239,6 +239,10 @@ export function PremiumScreen() {
                   Tạo mã QR mới
                 </button>
               </div>
+            ) : paymentStatus === 'pending' && !qrUrl ? (
+              <p role="alert" className="rounded-xl bg-amber-950/30 p-3 text-sm text-amber-400">
+                Đơn thanh toán đã được tạo nhưng chưa cấu hình tài khoản ngân hàng để tạo QR. Hãy thêm VITE_PREMIUM_BANK_ACCOUNT và VITE_PREMIUM_BANK_CODE trong Vercel rồi deploy lại.
+              </p>
             ) : qrUrl ? (
               <div className="text-center">
                 <img src={qrUrl} alt="Mã QR thanh toán SePay" className="mx-auto mb-4 w-56 rounded-xl bg-white p-2" />
