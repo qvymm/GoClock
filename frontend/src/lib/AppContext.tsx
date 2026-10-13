@@ -68,6 +68,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setScreen('resetPassword');
         return;
       }
+      setIsAuthenticated(Boolean(u));
       if (u) {
         loadProfile(u.id);
       }
@@ -132,7 +133,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setScreen('onboarding');
       }
     } else {
-      setScreen('onboarding');
+      // Tài khoản mới được vào app với dữ liệu rỗng; người dùng tự thêm dữ liệu qua các tiện ích.
+      setScreen('dashboard');
     }
   }
 
