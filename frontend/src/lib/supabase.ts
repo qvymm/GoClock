@@ -61,6 +61,8 @@ export type Profile = {
   wake_time?: string;
   notifications_enabled?: boolean;
   onboarding_completed?: boolean;
+  is_premium?: boolean;
+  premium_until?: string;
   notify_tasks?: boolean;
   notify_meals?: boolean;
   notify_sleep?: boolean;

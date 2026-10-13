@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useApp } from '../lib/AppContext';
+import { supabase } from '../lib/supabase';
 import { ArrowLeft, Check, Crown, Zap, Star, Shield } from 'lucide-react';
 
 const features = [
@@ -12,13 +13,100 @@ const features = [
 ];
 
 const plans = [
-  { id: 'monthly', name: 'Hàng tháng', price: '49.000đ', period: '/tháng', popular: false },
-  { id: 'yearly', name: 'Hàng năm', price: '399.000đ', period: '/năm', popular: true, savings: 'Tiết kiệm 33%' },
+  { id: 'monthly', name: 'Hàng tháng', price: '49.000đ', amount: 49000, period: '/tháng', popular: false },
+  { id: 'yearly', name: 'Hàng năm', price: '399.000đ', amount: 399000, period: '/năm', popular: true, savings: 'Tiết kiệm 33%' },
 ];
 
+const paymentEnv = (import.meta as any).env;
+const bank = {
+  account: paymentEnv.VITE_PREMIUM_BANK_ACCOUNT as string | undefined,
+  code: paymentEnv.VITE_PREMIUM_BANK_CODE as string | undefined,
+  name: paymentEnv.VITE_PREMIUM_BANK_NAME as string | undefined,
+  holder: paymentEnv.VITE_PREMIUM_BANK_HOLDER as string | undefined,
+};
+
 export function PremiumScreen() {
-  const { theme, setScreen } = useApp();
+  const { theme, setScreen, profile, setProfile } = useApp();
   const [selectedPlan, setSelectedPlan] = useState('yearly');
+  const [showPayment, setShowPayment] = useState(false);
+  const [transferCode, setTransferCode] = useState('');
+  const [expiresAt, setExpiresAt] = useState<number | null>(null);
+  const [secondsLeft, setSecondsLeft] = useState(180);
+  const [paymentAmount, setPaymentAmount] = useState(0);
+  const [paymentStatus, setPaymentStatus] = useState<'creating' | 'pending' | 'paid' | 'expired' | 'error'>('creating');
+  const [paymentError, setPaymentError] = useState('');
+  const expired = paymentStatus === 'expired' || secondsLeft <= 0;
+  const selectedPlanDetails = plans.find(plan => plan.id === selectedPlan) ?? plans[1];
+  const qrUrl = paymentStatus === 'pending' && transferCode && bank.account && bank.code
+    ? `https://qr.sepay.vn/img?acc=${encodeURIComponent(bank.account)}&bank=${encodeURIComponent(bank.code)}&amount=${encodeURIComponent(paymentAmount)}&des=${encodeURIComponent(transferCode)}&holder=${encodeURIComponent(bank.holder ?? '')}`
+    : '';
+
+  async function createPaymentOrder() {
+    setPaymentStatus('creating');
+    setPaymentError('');
+    setShowPayment(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Vui lòng đăng nhập lại để thanh toán.');
+      const response = await fetch('/api/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ plan: selectedPlan }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Không tạo được đơn thanh toán.');
+      setTransferCode(result.code);
+      setPaymentAmount(Number(result.amount));
+      setExpiresAt(new Date(result.expiresAt).getTime());
+      setSecondsLeft(180);
+      setPaymentStatus('pending');
+    } catch (error) {
+      setPaymentError(error instanceof Error ? error.message : 'Không tạo được đơn thanh toán.');
+      setPaymentStatus('error');
+    }
+  }
+
+  useEffect(() => {
+    if (!showPayment || paymentStatus !== 'pending' || expiresAt === null) return;
+    const updateCountdown = () => {
+      const remaining = Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000));
+      setSecondsLeft(remaining);
+      if (remaining === 0) setPaymentStatus('expired');
+    };
+    updateCountdown();
+    const timer = window.setInterval(updateCountdown, 1000);
+    return () => window.clearInterval(timer);
+  }, [showPayment, expiresAt, paymentStatus]);
+
+  useEffect(() => {
+    if (!showPayment || !transferCode || paymentStatus !== 'pending') return;
+    let active = true;
+    const checkOrder = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) return;
+        const response = await fetch(`/api/order-status?code=${encodeURIComponent(transferCode)}`, {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        const result = await response.json();
+        if (!response.ok || !active) return;
+        if (result.status === 'paid') {
+          setPaymentStatus('paid');
+          setProfile(profile ? { ...profile, is_premium: true } : profile);
+        } else if (result.status === 'expired') {
+          setPaymentStatus('expired');
+          setSecondsLeft(0);
+        }
+      } catch {
+        // Continue showing the QR; the next poll can pick up the webhook update.
+      }
+    };
+    const timer = window.setInterval(() => { void checkOrder(); }, 2500);
+    void checkOrder();
+    return () => { active = false; window.clearInterval(timer); };
+  }, [showPayment, transferCode, paymentStatus]);
+
+  const countdown = `${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, '0')}`;
 
   return (
     <div className="flex flex-col h-full" style={{ background: theme === 'dark' ? '#0d1f12' : '#f0f7f2' }}>
@@ -101,6 +189,7 @@ export function PremiumScreen() {
         </div>
 
         <button
+          onClick={createPaymentOrder}
           className="w-full py-4 rounded-2xl font-semibold text-base transition-all active:scale-95 mb-3"
           style={{ background: 'linear-gradient(135deg, #94d400 0%, #72a800 100%)', color: '#0d1f12' }}
         >
@@ -111,6 +200,53 @@ export function PremiumScreen() {
           Thanh toán qua App Store hoặc Google Play. Hủy bất cứ lúc nào.
         </p>
       </div>
+
+      {showPayment && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-labelledby="premium-payment-title">
+          <div className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-3xl p-5" style={{ background: theme === 'dark' ? '#14251b' : '#fff' }}>
+            <div className="mb-4 flex items-center justify-between">
+              <h2 id="premium-payment-title" className="text-lg font-bold" style={{ color: theme === 'dark' ? '#fff' : '#173325' }}>
+                Thanh toán Premium
+              </h2>
+              <button onClick={() => setShowPayment(false)} className="rounded-full px-3 py-1 text-sm text-white/60 hover:text-white" aria-label="Đóng">Đóng</button>
+            </div>
+
+            {paymentStatus === 'creating' ? (
+              <p className="py-8 text-center text-sm text-gray-400">Đang tạo đơn thanh toán…</p>
+            ) : paymentStatus === 'paid' ? (
+              <div className="py-8 text-center">
+                <p className="text-2xl font-bold text-[#94d400]">Thanh toán thành công</p>
+                <p className="mt-2 text-sm text-gray-400">Gói Premium đã được kích hoạt.</p>
+              </div>
+            ) : expired ? (
+              <div className="py-5 text-center">
+                <p className="font-semibold text-red-400">Mã QR đã hết hạn.</p>
+                <p className="mt-2 text-sm text-gray-400">Tạo mã mới để tiếp tục thanh toán.</p>
+                <button onClick={createPaymentOrder} className="mt-5 w-full rounded-2xl py-3.5 font-semibold text-[#0d1f12]" style={{ background: 'linear-gradient(135deg, #94d400 0%, #72a800 100%)' }}>
+                  Tạo mã QR mới
+                </button>
+              </div>
+            ) : qrUrl ? (
+              <div className="text-center">
+                <img src={qrUrl} alt="Mã QR thanh toán SePay" className="mx-auto mb-4 w-56 rounded-xl bg-white p-2" />
+                <p className="font-bold" style={{ color: theme === 'dark' ? '#fff' : '#173325' }}>{selectedPlanDetails.name} · {paymentAmount.toLocaleString('vi-VN')}đ</p>
+                {bank.name && <p className="mt-2 text-sm text-gray-400">Ngân hàng: {bank.name}</p>}
+                {bank.account && <p className="text-sm text-gray-400">Số tài khoản: {bank.account}</p>}
+                {bank.holder && <p className="text-sm text-gray-400">Chủ tài khoản: {bank.holder}</p>}
+                <p className="mt-3 text-sm text-gray-400">Nội dung chuyển khoản</p>
+                <code className="mt-1 inline-block rounded-lg bg-black/20 px-3 py-2 font-bold text-[#94d400]">{transferCode}</code>
+                <p className="mt-4 text-sm font-semibold text-amber-400">Mã hết hạn sau {countdown}</p>
+                <p className="mt-1 text-xs text-gray-500">Quét mã bằng ứng dụng ngân hàng để thanh toán.</p>
+              </div>
+            ) : (
+              <div>
+                {paymentError && <p role="alert" className="rounded-xl bg-red-950/40 p-3 text-sm text-red-400">{paymentError}</p>}
+                <button onClick={createPaymentOrder} className="mt-4 w-full rounded-2xl py-3.5 font-semibold text-[#0d1f12]" style={{ background: 'linear-gradient(135deg, #94d400 0%, #72a800 100%)' }}>Thử tạo đơn lại</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

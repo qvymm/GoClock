@@ -1,9 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../lib/AppContext';
-import { supabase } from '../lib/supabase';
+import { supabase, Profile } from '../lib/supabase';
 import {
-  ArrowLeft, ChevronRight, Bell, Moon, Utensils, BookOpen, Scale,
-  User, UserCircle, Circle, Clock, Sparkles, Check,
+  ArrowLeft, ChevronRight, Bell, Moon, Utensils, Scale, Sparkles, Check,
 } from 'lucide-react';
 
 type Gender = 'male' | 'female' | 'other';
@@ -13,22 +12,60 @@ type Goal = 'sleep' | 'nutrition' | 'study' | 'balance';
 const TOTAL_STEPS = 9;
 
 export function OnboardingScreen() {
-  const { setScreen, user } = useApp();
+  const { setScreen, user, profile, setProfile } = useApp();
   const [step, setStep] = useState(0);
-  const [nickname, setNickname] = useState('');
+  const [nickname, setNickname] = useState(user?.user_metadata?.full_name || '');
   const [gender, setGender] = useState<Gender | null>(null);
-  const [dob, setDob] = useState('2002-06-16');
-  const [height, setHeight] = useState(170);
-  const [weight, setWeight] = useState(65);
+  const [dob, setDob] = useState('');
+  const [birthDay, setBirthDay] = useState('');
+  const [birthMonth, setBirthMonth] = useState('');
+  const [birthYear, setBirthYear] = useState('');
+  const [height, setHeight] = useState<number | null>(null);
+  const [weight, setWeight] = useState<number | null>(null);
   const [activity, setActivity] = useState<Activity | null>(null);
   const [goal, setGoal] = useState<Goal | null>(null);
   const [wakeHour, setWakeHour] = useState(7);
   const [wakeMinute, setWakeMinute] = useState(0);
   const [notifGranted, setNotifGranted] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [loadingMsg, setLoadingMsg] = useState('');
   const [error, setError] = useState('');
   const [analysisStepIndex, setAnalysisStepIndex] = useState(0);
+  const [profileSaved, setProfileSaved] = useState(false);
+
+  const birthDate = dob ? new Date(`${dob}T00:00:00`) : null;
+  const today = new Date();
+  let age = birthDate ? today.getFullYear() - birthDate.getFullYear() : 0;
+  if (birthDate && (today.getMonth() < birthDate.getMonth() || (today.getMonth() === birthDate.getMonth() && today.getDate() < birthDate.getDate()))) age -= 1;
+  const bmi = height && weight ? weight / ((height / 100) ** 2) : 0;
+  const activityFactor: Record<Activity, number> = { sedentary: 1.2, light: 1.375, active: 1.725 };
+  const bmrOffset = gender === 'male' ? 5 : gender === 'female' ? -161 : -78;
+  const tdee = height && weight && gender && age > 0 && activity
+    ? Math.round((10 * weight + 6.25 * height - 5 * age + bmrOffset) * activityFactor[activity])
+    : 0;
+
+  function updateBirthDate(part: 'day' | 'month' | 'year', value: string) {
+    const nextDay = part === 'day' ? value : birthDay;
+    const nextMonth = part === 'month' ? value : birthMonth;
+    const nextYear = part === 'year' ? value : birthYear;
+    if (part === 'day') setBirthDay(value);
+    if (part === 'month') setBirthMonth(value);
+    if (part === 'year') setBirthYear(value);
+
+    const day = Number(nextDay), month = Number(nextMonth), year = Number(nextYear);
+    if (!nextDay || !nextMonth || !nextYear || !Number.isInteger(day) || !Number.isInteger(month) || !Number.isInteger(year)) {
+      setDob('');
+      return;
+    }
+    const maxDay = new Date(year, month, 0).getDate();
+    const today = new Date();
+    const selected = new Date(year, month - 1, day);
+    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    if (year < 1900 || year > today.getFullYear() || month < 1 || month > 12 || day < 1 || day > maxDay || selected > todayStart) {
+      setDob('');
+      return;
+    }
+    setDob(`${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`);
+  }
 
   const clockRef = useRef<HTMLDivElement>(null);
   const [isDraggingClock, setIsDraggingClock] = useState(false);
@@ -103,7 +140,7 @@ export function OnboardingScreen() {
   function goBack() {
     setError('');
     if (step === 0) {
-      setScreen('splash');
+      setScreen('login');
     } else {
       setStep(s => s - 1);
     }
@@ -118,7 +155,7 @@ export function OnboardingScreen() {
     switch (step) {
       case 0: return nickname.trim().length > 0;
       case 1: return gender !== null && dob !== '';
-      case 2: return true;
+      case 2: return height !== null && height >= 120 && height <= 220 && weight !== null && weight >= 30 && weight <= 150;
       case 3: return activity !== null;
       case 4: return goal !== null;
       case 5: return true;
@@ -164,57 +201,40 @@ export function OnboardingScreen() {
     setStep(8);
   }
 
-  async function handleGoogleLogin() {
-    setError('');
-    setLoading(true);
-
-    const pendingData = {
-      nickname, gender, dob, height, weight, activity, goal, wakeHour, wakeMinute, notifGranted
-    };
-    localStorage.setItem('pending_onboarding', JSON.stringify(pendingData));
-
-    const { error: err } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: window.location.origin },
-    });
-    if (err) {
-      setError(err.message);
-      setLoading(false);
-    }
-  }
-
   async function saveProfile(userId?: string) {
     if (!userId) return;
-    const h = height, w = weight;
-    const bmi = w / ((h / 100) ** 2);
-    const activityMap: Record<Activity, string> = {
-      sedentary: 'sedentary', light: 'light', active: 'active',
-    };
-    const tdee = Math.round(
-      (gender === 'male' ? 88.36 : 447.6) +
-      (gender === 'male' ? 13.4 : 9.25) * w +
-      (gender === 'male' ? 4.8 : 3.10) * h -
-      (gender === 'male' ? 5.68 : 4.33) * 25
-    );
+    setError('');
+    if (!height || !weight || !gender || !dob || !activity || !bmi || !tdee) {
+      setError('Vui lòng hoàn tất thông tin để tính BMI và TDEE.');
+      return;
+    }
     const wakeTimeStr = `${String(wakeHour).padStart(2, '0')}:${String(wakeMinute).padStart(2, '0')}`;
-    await supabase.from('profiles').upsert({
+    const updatedProfile = {
       id: userId,
       nickname,
       full_name: nickname,
       gender,
       date_of_birth: dob,
-      height: h,
-      weight: w,
+      height,
+      weight,
       bmi: Math.round(bmi * 10) / 10,
       tdee,
-      activity_level: activityMap[activity!],
+      activity_level: activity,
       primary_goal: goal,
       wake_time: wakeTimeStr,
       notifications_enabled: notifGranted,
       onboarding_completed: true,
-    });
+    };
+    setLoading(true);
+    const { error: saveError } = await supabase.from('profiles').upsert(updatedProfile);
+    setLoading(false);
+    if (saveError) {
+      setError(saveError.message);
+      return;
+    }
+    setProfile({ ...profile, ...updatedProfile } as Profile);
+    setProfileSaved(true);
     localStorage.setItem('show_coachmarks', 'true');
-    setScreen('dashboard');
   }
 
   const progress = ((step + 1) / TOTAL_STEPS) * 100;
@@ -286,23 +306,6 @@ export function OnboardingScreen() {
 
         {/* Step 1: Gender + DOB */}
         {step === 1 && (() => {
-          const currentDob = dob || '2002-06-16';
-          const parts = currentDob.split('-');
-          const currentYear = parseInt(parts[0]) || 2002;
-          const currentMonth = parseInt(parts[1]) || 6;
-          const currentDay = parseInt(parts[2]) || 16;
-
-          const days = Array.from({ length: 31 }, (_, i) => i + 1);
-          const months = Array.from({ length: 12 }, (_, i) => i + 1);
-          const years = Array.from({ length: 70 }, (_, i) => 2026 - i);
-
-          const updateDate = (d: number, m: number, y: number) => {
-            const maxDays = new Date(y, m, 0).getDate();
-            const adjustedDay = Math.min(d, maxDays);
-            const formatted = `${y}-${String(m).padStart(2, '0')}-${String(adjustedDay).padStart(2, '0')}`;
-            setDob(formatted);
-          };
-
           return (
             <div className="flex flex-col h-full justify-between">
               <div className="flex-1 overflow-y-auto scroll-content pb-4">
@@ -366,28 +369,29 @@ export function OnboardingScreen() {
                   })}
                 </div>
 
-                {/* DOB scroll selector */}
+                {/* Date of birth numeric fields */}
                 <p className="text-[10px] font-bold tracking-wider text-[#94d400] mb-3">NGÀY SINH</p>
-                <div className="relative bg-white/5 border border-white/10 rounded-2xl h-[120px] flex overflow-hidden mb-6">
-                  {/* Highlight bar in center */}
-                  <div className="absolute inset-x-0 top-[40px] h-[40px] border-y border-[#c8ec2d]/20 bg-[#c8ec2d]/5 pointer-events-none" />
-
-                  <WheelColumn
-                    items={days}
-                    value={currentDay}
-                    onChange={(d) => updateDate(d, currentMonth, currentYear)}
-                  />
-                  <WheelColumn
-                    items={months}
-                    value={currentMonth}
-                    onChange={(m) => updateDate(currentDay, m, currentYear)}
-                    labelFormatter={(m) => `Th ${m}`}
-                  />
-                  <WheelColumn
-                    items={years}
-                    value={currentYear}
-                    onChange={(y) => updateDate(currentDay, currentMonth, y)}
-                  />
+                <p className="text-xs text-white/40 mb-2">{dob ? `Đã chọn: ${dob}` : 'Chọn ngày sinh để tính TDEE.'}</p>
+                <div className="grid grid-cols-3 gap-3 mb-6">
+                  {[
+                    { label: 'Ngày', value: birthDay, part: 'day' as const, min: 1, max: 31, placeholder: 'DD' },
+                    { label: 'Tháng', value: birthMonth, part: 'month' as const, min: 1, max: 12, placeholder: 'MM' },
+                    { label: 'Năm', value: birthYear, part: 'year' as const, min: 1900, max: new Date().getFullYear(), placeholder: 'YYYY' },
+                  ].map(field => (
+                    <label key={field.part} className="text-xs text-white/50">
+                      {field.label}
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min={field.min}
+                        max={field.max}
+                        value={field.value}
+                        placeholder={field.placeholder}
+                        onChange={event => updateBirthDate(field.part, event.target.value)}
+                        className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-center text-base font-semibold text-white outline-none focus:border-[#94d400]/60"
+                      />
+                    </label>
+                  ))}
                 </div>
 
                 {/* Informative banner */}
@@ -411,7 +415,7 @@ export function OnboardingScreen() {
           );
         })()}
 
-        {/* Step 2: Height + Weight sliders */}
+        {/* Step 2: Height + Weight */}
         {step === 2 && (
           <div className="flex flex-col h-full justify-between">
             <div className="flex-1 overflow-y-auto scroll-content pb-4">
@@ -423,40 +427,35 @@ export function OnboardingScreen() {
                 Thông tin này giúp GõClock tính toán chỉ số BMI và lịch trình vận động chính xác hơn.
               </p>
 
-              {/* Height Selector */}
-              <div className="mb-8">
-                <div className="flex items-center justify-between px-1 mb-1">
-                  <span className="text-lg font-bold text-white/90">Chiều cao</span>
-                  <span className="text-3xl font-black text-[#c8ec2d]">
-                    {height} <span className="text-sm font-bold text-white/40">cm</span>
-                  </span>
-                </div>
-                <div className="relative py-2">
-                  <RulerSlider
+              <div className="grid grid-cols-2 gap-4 mb-8">
+                <label className="block">
+                  <span className="block text-sm font-bold text-white/80 mb-2">Chiều cao (cm)</span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
                     min={120}
                     max={220}
-                    value={height}
-                    onChange={setHeight}
+                    step="0.1"
+                    value={height ?? ''}
+                    onChange={e => setHeight(e.target.value === '' ? null : Number(e.target.value))}
+                    placeholder="Ví dụ: 165"
+                    className="w-full rounded-xl border border-white/15 bg-white/5 px-4 py-4 text-xl font-bold text-white outline-none focus:border-[#c8ec2d]"
                   />
-                </div>
-              </div>
-
-              {/* Weight Selector */}
-              <div className="mb-8">
-                <div className="flex items-center justify-between px-1 mb-1">
-                  <span className="text-lg font-bold text-white/90">Cân nặng</span>
-                  <span className="text-3xl font-black text-[#c8ec2d]">
-                    {weight} <span className="text-sm font-bold text-white/40">kg</span>
-                  </span>
-                </div>
-                <div className="relative py-2">
-                  <RulerSlider
+                </label>
+                <label className="block">
+                  <span className="block text-sm font-bold text-white/80 mb-2">Cân nặng (kg)</span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
                     min={30}
                     max={150}
-                    value={weight}
-                    onChange={setWeight}
+                    step="0.1"
+                    value={weight ?? ''}
+                    onChange={e => setWeight(e.target.value === '' ? null : Number(e.target.value))}
+                    placeholder="Ví dụ: 55"
+                    className="w-full rounded-xl border border-white/15 bg-white/5 px-4 py-4 text-xl font-bold text-white outline-none focus:border-[#c8ec2d]"
                   />
-                </div>
+                </label>
               </div>
 
               {/* Private Lock text */}
@@ -1038,55 +1037,41 @@ export function OnboardingScreen() {
           );
         })()}
 
-        {/* Step 8: Login */}
+        {/* Step 8: calculated profile results */}
         {step === 8 && (
-          <div className="flex flex-col h-full items-center justify-center py-6">
+          <div className="flex flex-col h-full items-center justify-center py-6 px-5">
+            <h2 className="text-3xl font-extrabold text-white mb-2 text-center">Chỉ số của bạn</h2>
+            <p className="text-sm text-white/60 text-center mb-8">Tính từ thông tin bạn vừa cung cấp.</p>
 
-            {/* Celebration logo & title */}
-            <div className="flex flex-col items-center mb-8 text-center px-4">
-              <div className="relative w-24 h-24 mb-4 flex items-center justify-center rounded-full bg-[#d8ff7f1a] border border-[#d8ff7f33] shadow-[0_0_15px_rgba(216,255,127,0.1)] animate-pulse overflow-hidden">
-                <img src="/logo.png" alt="GoClock Logo" className="w-16 h-16 object-contain" />
+            <div className="grid grid-cols-2 gap-3 w-full max-w-[360px] mb-6">
+              <div className="rounded-2xl p-5 text-center bg-white/5 border border-white/10">
+                <p className="text-xs text-white/50 mb-2">BMI</p>
+                <p className="text-3xl font-black text-[#c8ec2d]">{bmi.toFixed(1)}</p>
               </div>
-              <h2 className="text-3xl font-extrabold text-white mb-2 leading-tight">
-                Lộ trình đã sẵn sàng!
-              </h2>
+              <div className="rounded-2xl p-5 text-center bg-white/5 border border-white/10">
+                <p className="text-xs text-white/50 mb-2">TDEE</p>
+                <p className="text-3xl font-black text-[#c8ec2d]">{tdee}</p>
+                <p className="text-xs text-white/40 mt-1">kcal/ngày</p>
+              </div>
             </div>
 
-            {error && (
-              <div className="w-full max-w-[340px] rounded-xl p-3 text-sm mb-4"
-                style={{ background: 'rgba(142,49,20,0.3)', color: '#f87171', border: '1px solid rgba(142,49,20,0.5)' }}>
-                {error}
-              </div>
+            {loading && <p className="text-sm text-white/60 mb-4">Đang lưu hồ sơ...</p>}
+            {error && <div className="w-full max-w-[360px] rounded-xl p-3 text-sm mb-4 bg-red-950/40 text-red-400 border border-red-800/50">{error}</div>}
+
+            {error && !profileSaved && (
+              <button onClick={() => user && saveProfile(user.id)} disabled={loading} className="text-sm text-white/70 underline mb-4">
+                Thử lưu lại
+              </button>
             )}
 
-            {/* Google CTA directly */}
-            <div className="w-full max-w-[340px] px-4">
-              <button
-                onClick={handleGoogleLogin}
-                disabled={loading}
-                className="w-full py-4 rounded-full font-bold text-sm tracking-wider flex items-center justify-center gap-3 transition-all active:scale-95 disabled:opacity-60 bg-white text-[#1a1a1a] shadow-[0px_4px_24px_rgba(255,255,255,0.15)] hover:bg-white/95"
-              >
-                <GoogleIcon />
-                {loading ? 'ĐANG KẾT NỐI...' : 'TIẾP TỤC VỚI GOOGLE'}
-              </button>
-            </div>
-
-            {/* Register or Login link */}
-            <div className="flex items-center gap-3 mt-8">
-              <button
-                onClick={() => setScreen('login')}
-                className="text-xs font-semibold text-white/50 hover:text-white transition-colors py-2"
-              >
-                Đăng nhập tài khoản
-              </button>
-              <span className="text-white/20 text-xs">•</span>
-              <button
-                onClick={() => setScreen('register')}
-                className="text-xs font-semibold text-[#94d400] hover:underline transition-colors py-2"
-              >
-                Đăng ký tài khoản
-              </button>
-            </div>
+            <button
+              onClick={() => setScreen('dashboard')}
+              disabled={!profileSaved || loading}
+              className="w-full max-w-[360px] py-4 rounded-full font-bold disabled:opacity-50"
+              style={{ background: '#c8ec2d', color: '#0d2215' }}
+            >
+              Vào ứng dụng
+            </button>
           </div>
         )}
       </div>

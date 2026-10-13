@@ -43,7 +43,7 @@ export function SplashScreen() {
         {/* Buttons */}
         <div className="w-full flex flex-col gap-3">
           <button
-            onClick={() => setScreen('onboarding')}
+            onClick={() => setScreen('register')}
             className="w-full py-4 rounded-2xl font-semibold text-base transition-all active:scale-95"
             style={{
               background: 'linear-gradient(135deg, #94d400 0%, #72a800 100%)',

@@ -7,11 +7,11 @@ export function ProfileScreen() {
   const { user, profile, setProfile, logout, theme, setScreen } = useApp();
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
-    full_name: profile?.full_name || 'Người dùng GõClock',
-    height: profile?.height?.toString() || '170',
-    weight: profile?.weight?.toString() || '60',
-    gender: profile?.gender || 'male',
-    activity_level: profile?.activity_level || 'moderate',
+    full_name: profile?.full_name || user?.user_metadata?.full_name || '',
+    height: profile?.height?.toString() || '',
+    weight: profile?.weight?.toString() || '',
+    gender: profile?.gender || '',
+    activity_level: profile?.activity_level || '',
     notify_tasks: profile?.notify_tasks ?? true,
     notify_meals: profile?.notify_meals ?? true,
     notify_sleep: profile?.notify_sleep ?? true,
@@ -37,7 +37,8 @@ export function ProfileScreen() {
     if (!h || !w) return 0;
     const age = profile?.date_of_birth
       ? Math.floor((Date.now() - new Date(profile.date_of_birth).getTime()) / (365.25 * 24 * 3600000))
-      : 20;
+      : 0;
+    if (!h || !w || !age || !form.gender || !form.activity_level) return 0;
     let bmr = form.gender === 'male'
       ? 88.362 + 13.397 * w + 4.799 * h - 5.677 * age
       : 447.593 + 9.247 * w + 3.098 * h - 4.330 * age;
@@ -54,10 +55,12 @@ export function ProfileScreen() {
     setSaving(true);
     const updated = {
       ...form,
-      height: h,
-      weight: w,
+      height: Number.isFinite(h) && h > 0 ? h : undefined,
+      weight: Number.isFinite(w) && w > 0 ? w : undefined,
+      gender: form.gender || undefined,
+      activity_level: form.activity_level || undefined,
       bmi: bmi ? Math.round(bmi * 10) / 10 : undefined,
-      tdee,
+      tdee: tdee || undefined,
       updated_at: new Date().toISOString(),
     };
     if (user) {
@@ -77,7 +80,7 @@ export function ProfileScreen() {
     { icon: Settings, label: 'Cài đặt', screen: 'settings', color: '#1967d2' },
     { icon: HelpCircle, label: 'Trợ giúp', screen: 'help', color: '#137333' },
     { icon: BookOpen, label: 'Hướng dẫn', screen: 'guide', color: '#b06000' },
-    { icon: Crown, label: 'Gói Premium', screen: 'premium', color: '#e65100', badge: 'FREE' },
+    { icon: Crown, label: 'Gói Premium', screen: 'premium', color: '#e65100', badge: profile?.is_premium ? 'PREMIUM' : 'FREE' },
   ];
 
   return (
@@ -176,7 +179,7 @@ export function ProfileScreen() {
               </div>
             ) : (
               <p className="font-medium text-sm" style={{ color: theme === 'dark' ? '#fff' : '#202124' }}>
-                {form.gender === 'male' ? 'Nam' : form.gender === 'female' ? 'Nữ' : 'Khác'}
+                {form.gender === 'male' ? 'Nam' : form.gender === 'female' ? 'Nữ' : form.gender === 'other' ? 'Khác' : 'Chưa cập nhật'}
               </p>
             )}
           </div>
@@ -190,7 +193,7 @@ export function ProfileScreen() {
                 {Object.entries(activityLabels).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select>
             ) : (
-              <p className="font-medium text-sm" style={{ color: theme === 'dark' ? '#fff' : '#202124' }}>{activityLabels[form.activity_level]}</p>
+              <p className="font-medium text-sm" style={{ color: theme === 'dark' ? '#fff' : '#202124' }}>{activityLabels[form.activity_level] || 'Chưa cập nhật'}</p>
             )}
           </div>
         </div>

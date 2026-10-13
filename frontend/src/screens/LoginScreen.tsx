@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../lib/AppContext';
-import { supabase } from '../lib/supabase';
+import { isSupabaseEnabled, supabase } from '../lib/supabase';
 import { ArrowLeft, Eye, EyeOff, Mail, Phone, Lock } from 'lucide-react';
 
 function GoogleIcon() {
@@ -23,6 +23,10 @@ export function LoginScreen() {
   const [error, setError] = useState('');
 
   async function handleGoogleLogin() {
+    if (!isSupabaseEnabled) {
+      setError('Chưa cấu hình dịch vụ đăng nhập. Vui lòng thiết lập Supabase cho ứng dụng trước.');
+      return;
+    }
     const { error: err } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: window.location.origin },
@@ -32,6 +36,10 @@ export function LoginScreen() {
 
   async function handleLogin() {
     if (!credential || !password) { setError('Vui lòng nhập đầy đủ thông tin'); return; }
+    if (!isSupabaseEnabled && !(credential === 'admin@goclock.com' && password === 'admin')) {
+      setError('Chưa cấu hình dịch vụ đăng nhập. Vui lòng thiết lập Supabase cho ứng dụng trước.');
+      return;
+    }
     setLoading(true);
     setError('');
     const email = credential.includes('@') ? credential : credential + '@goclock.com';

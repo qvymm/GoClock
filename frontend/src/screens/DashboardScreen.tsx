@@ -112,7 +112,7 @@ export function DashboardScreen() {
     return 'Chào buổi tối';
   }
 
-  const name = profile?.full_name || user?.email?.split('@')[0] || 'bạn';
+  const name = profile?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'bạn';
   const avatarUrl = profile?.avatar_url;
 
   const completedToday = displayTasks.filter(t => t.status === 'completed').length;
@@ -121,11 +121,11 @@ export function DashboardScreen() {
   const totalToday = displayTasks.length;
   const completionPct = totalToday > 0 ? Math.round((completedToday / totalToday) * 100) : 0;
 
-  const todayCalories = meals.reduce((s, m) => s + m.calories, 0) || 1240;
-  const targetCalories = profile?.tdee || 2000;
+  const todayCalories = meals.reduce((s, m) => s + m.calories, 0);
+  const targetCalories = profile?.tdee || 0;
   const lastSleep = sleepLogs[0];
-  const sleepHours = lastSleep?.duration_minutes ? (lastSleep.duration_minutes / 60).toFixed(1) : '7.5';
-  const sleepQuality = lastSleep?.quality || 'good';
+  const sleepHours = lastSleep?.duration_minutes ? (lastSleep.duration_minutes / 60).toFixed(1) : null;
+  const sleepQuality = lastSleep?.quality;
 
   const upcomingTask = displayTasks
     .filter(t => t.status !== 'completed' && t.deadline)
@@ -136,12 +136,12 @@ export function DashboardScreen() {
     : false;
 
   // Calorie circular progress
-  const caloriePct = Math.min(100, Math.round((todayCalories / targetCalories) * 100)) || 42;
+  const caloriePct = targetCalories > 0 ? Math.min(100, Math.round((todayCalories / targetCalories) * 100)) : 0;
   const radius = 28, stroke = 6;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (caloriePct / 100) * circumference;
 
-  function getSleepLabel(q: string) {
+  function getSleepLabel(q?: string) {
     if (q === 'excellent') return 'Rất tốt';
     if (q === 'good') return 'Tốt';
     if (q === 'fair') return 'Trung bình';
@@ -253,9 +253,9 @@ export function DashboardScreen() {
                   strokeDasharray={circumference} strokeDashoffset={strokeDashoffset}
                   strokeLinecap="round" className="transition-all duration-500" />
               </svg>
-              <span className="absolute text-sm font-extrabold text-gray-800">{caloriePct}%</span>
+              <span className="absolute text-sm font-extrabold text-gray-800">{targetCalories ? `${caloriePct}%` : '—'}</span>
             </div>
-            <p className="text-xs font-bold text-center mt-1 text-gray-700">{todayCalories}/{targetCalories} kcal</p>
+            <p className="text-xs font-bold text-center mt-1 text-gray-700">{todayCalories}{targetCalories ? `/${targetCalories}` : ''} kcal</p>
           </div>
 
           {/* Sleep Card */}
@@ -265,11 +265,11 @@ export function DashboardScreen() {
               <span className="text-[10px] font-bold tracking-wider uppercase">Giấc ngủ</span>
             </div>
             <div className="flex flex-col items-center justify-center my-1">
-              <span className="text-3xl font-black text-gray-800 tracking-tight">{sleepHours}h</span>
-              <span className="text-[10px] font-bold px-3 py-1 rounded-full mt-2"
+              <span className="text-3xl font-black text-gray-800 tracking-tight">{sleepHours ? `${sleepHours}h` : '—'}</span>
+              {sleepQuality && <span className="text-[10px] font-bold px-3 py-1 rounded-full mt-2"
                 style={{ background: '#ebdcb9', color: '#967c3b' }}>
                 {getSleepLabel(sleepQuality)}
-              </span>
+              </span>}
             </div>
           </div>
         </div>

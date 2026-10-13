@@ -31,7 +31,7 @@ type AppContextType = {
   loginAdmin: (email: string, password: string) => boolean;
   user: User | null;
   profile: Profile | null;
-  setProfile: (p: Profile) => void;
+  setProfile: (p: Profile | null) => void;
   tasks: Task[];
   meals: Meal[];
   sleepLogs: SleepLog[];
@@ -47,7 +47,7 @@ type AppContextType = {
 const AppContext = createContext<AppContextType | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [screen, setScreen] = useState<AppScreen>(isSupabaseEnabled ? 'splash' : 'dashboard');
+  const [screen, setScreen] = useState<AppScreen>('login');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [user, setUser] = useState<User | null>(null);
@@ -55,7 +55,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [meals, setMeals] = useState<Meal[]>([]);
   const [sleepLogs, setSleepLogs] = useState<SleepLog[]>([]);
-  const [notificationCount] = useState(3);
+  const [notificationCount] = useState(0);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
   useEffect(() => {
@@ -64,76 +64,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       const u = session?.user ?? null;
       setUser(u);
+      setIsAuthenticated(Boolean(u));
       if (event === 'PASSWORD_RECOVERY') {
         setScreen('resetPassword');
         return;
       }
       if (u) {
         loadProfile(u.id);
+      } else {
+        setProfile(null);
+        setTasks([]);
+        setMeals([]);
+        setSleepLogs([]);
       }
     });
     return () => subscription.unsubscribe();
   }, []);
 
   async function loadProfile(userId: string) {
-    const pendingStr = localStorage.getItem('pending_onboarding');
-    if (pendingStr) {
-      try {
-        const pendingData = JSON.parse(pendingStr);
-        localStorage.removeItem('pending_onboarding');
-        
-        const h = pendingData.height || 170, w = pendingData.weight || 60;
-        const bmi = w / ((h / 100) ** 2);
-        const activityMap: Record<string, string> = {
-          sedentary: 'sedentary', light: 'light', active: 'active',
-        };
-        const gender = pendingData.gender || 'male';
-        const tdee = Math.round(
-          (gender === 'male' ? 88.36 : 447.6) +
-          (gender === 'male' ? 13.4 : 9.25) * w +
-          (gender === 'male' ? 4.8 : 3.10) * h -
-          (gender === 'male' ? 5.68 : 4.33) * 25
-        );
-        const wakeTimeStr = `${String(pendingData.wakeHour || 6).padStart(2, '0')}:${String(pendingData.wakeMinute || 30).padStart(2, '0')}`;
-        
-        const { data: newProfile } = await supabase.from('profiles').upsert({
-          id: userId,
-          nickname: pendingData.nickname || 'Bạn',
-          full_name: pendingData.nickname || 'Bạn',
-          gender: pendingData.gender || 'other',
-          date_of_birth: pendingData.dob || new Date().toISOString().split('T')[0],
-          height: h,
-          weight: w,
-          bmi: Math.round(bmi * 10) / 10,
-          tdee,
-          activity_level: activityMap[pendingData.activity] || 'light',
-          primary_goal: pendingData.goal || 'focus',
-          wake_time: wakeTimeStr,
-          notifications_enabled: pendingData.notifGranted || false,
-          onboarding_completed: true,
-        }).select().maybeSingle();
-
-        if (newProfile) {
-          setProfile(newProfile as Profile);
-          setScreen('dashboard');
-          return;
-        }
-      } catch (e) {
-        console.error("Error saving pending onboarding:", e);
-      }
-    }
-
     const { data } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
-    if (data) {
-      setProfile(data as Profile);
-      if (data.onboarding_completed) {
-        setScreen('dashboard');
-      } else {
-        setScreen('onboarding');
-      }
-    } else {
-      setScreen('onboarding');
-    }
+    const loadedProfile = data as Profile | null;
+    setProfile(loadedProfile);
+    setScreen(loadedProfile?.onboarding_completed ? 'dashboard' : 'onboarding');
   }
 
   async function refreshTasks() {
@@ -201,7 +153,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setTasks([]);
     setMeals([]);
     setSleepLogs([]);
-    setScreen('splash');
+    setScreen('login');
   }
 
   return (

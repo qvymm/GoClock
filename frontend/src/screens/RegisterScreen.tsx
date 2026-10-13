@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../lib/AppContext';
-import { supabase } from '../lib/supabase';
+import { isSupabaseEnabled, supabase } from '../lib/supabase';
 import { ArrowLeft, Eye, EyeOff, Mail, Lock, User, ArrowRight, RotateCw, CheckCircle2 } from 'lucide-react';
 import { OtpInput } from '../components/OtpInput';
 
@@ -58,6 +58,10 @@ export function RegisterScreen() {
 
   async function handleGoogleLogin() {
     setError('');
+    if (!isSupabaseEnabled) {
+      setError('Chưa cấu hình dịch vụ đăng ký. Vui lòng thiết lập Supabase cho ứng dụng trước.');
+      return;
+    }
     const { error: err } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: window.location.origin },
@@ -69,6 +73,11 @@ export function RegisterScreen() {
     if (e) e.preventDefault();
     setError('');
     setSuccessMsg('');
+
+    if (!isSupabaseEnabled) {
+      setError('Chưa cấu hình dịch vụ đăng ký. Vui lòng thiết lập Supabase cho ứng dụng trước.');
+      return;
+    }
 
     if (!fullName.trim()) {
       setError('Vui lòng nhập họ và tên');
@@ -113,11 +122,7 @@ export function RegisterScreen() {
       return;
     }
 
-    // Nếu cần xác thực OTP
-    setStep('otp');
-    setCountdown(60);
-    setCanResend(false);
-    setSuccessMsg(`Mã xác thực 6 số đã được gửi tới ${email.trim()}`);
+    setError('Supabase vẫn đang yêu cầu xác nhận email. Hãy tắt Confirm email trong Authentication > Providers > Email để đăng ký không cần OTP.');
   }
 
   async function handleVerifyOtp() {
@@ -151,10 +156,7 @@ export function RegisterScreen() {
       }
     }
 
-    // Thành công -> Lưu nickname và chuyển sang onboarding hoặc dashboard
-    localStorage.setItem('pending_onboarding', JSON.stringify({
-      nickname: fullName.trim().split(' ')[0] || fullName.trim(),
-    }));
+    // Profile and feature data are created only when the user chooses to enter them.
   }
 
   async function handleResendOtp() {
@@ -331,7 +333,7 @@ export function RegisterScreen() {
                 className="w-full py-3.5 rounded-2xl font-bold text-sm transition-all active:scale-95 disabled:opacity-60 flex items-center justify-center gap-2 mt-2 shadow-[0_4px_20px_rgba(148,212,0,0.3)]"
                 style={{ background: 'linear-gradient(135deg, #94d400 0%, #72a800 100%)', color: '#0d1f12' }}
               >
-                {loading ? 'Đang khởi tạo tài khoản...' : 'Tiếp tục & Nhận mã OTP'}
+                {loading ? 'Đang khởi tạo tài khoản...' : 'Tạo tài khoản'}
                 {!loading && <ArrowRight size={18} />}
               </button>
             </form>
