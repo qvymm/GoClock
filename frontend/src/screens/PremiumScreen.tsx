@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useApp } from '../lib/AppContext';
-import { supabase } from '../lib/supabase';
+import { isPremiumActive, supabase } from '../lib/supabase';
 import { ArrowLeft, Check, Crown, Zap, Star, Shield } from 'lucide-react';
 
 const features = [
@@ -60,6 +60,7 @@ export function PremiumScreen() {
   const [paymentAmount, setPaymentAmount] = useState(0);
   const [paymentStatus, setPaymentStatus] = useState<'creating' | 'pending' | 'paid' | 'expired' | 'error'>('creating');
   const [paymentError, setPaymentError] = useState('');
+  const premiumActive = isPremiumActive(profile);
   const expired = paymentStatus === 'expired' || secondsLeft <= 0;
   const selectedPlanDetails = plans.find(plan => plan.id === selectedPlan) ?? plans[1];
   const qrUrl = paymentStatus === 'pending' && transferCode && bank.account && bank.code
@@ -149,6 +150,13 @@ export function PremiumScreen() {
             <Crown size={32} style={{ color: '#0d1f12' }} />
           </div>
           <p className="text-sm text-center" style={{ color: 'rgba(255,255,255,0.6)' }}>Mở khóa toàn bộ tính năng cao cấp</p>
+          <div className="mt-4 rounded-full px-4 py-2 text-xs font-semibold" style={premiumActive
+            ? { color: '#d9ff70', background: 'rgba(148,212,0,0.16)', border: '1px solid rgba(148,212,0,0.35)' }
+            : { color: 'rgba(255,255,255,0.75)', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}>
+            {premiumActive
+              ? `ĐANG DÙNG PREMIUM${profile?.premium_until ? ` · đến ${new Date(profile.premium_until).toLocaleDateString('vi-VN')}` : ''}`
+              : 'BẠN ĐANG DÙNG GÓI FREE'}
+          </div>
         </div>
       </div>
 
