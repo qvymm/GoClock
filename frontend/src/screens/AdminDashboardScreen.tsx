@@ -287,7 +287,6 @@ export function AdminDashboardScreen() {
                     </div>
                   </div>
                 </ChartCard>
-                </div>
               </div>
             </section>
           )}
