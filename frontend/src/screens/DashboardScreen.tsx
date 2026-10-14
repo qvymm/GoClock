@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
-import { Bell, ChevronRight, BarChart3, Sparkles, Flame, AlertTriangle } from 'lucide-react';
+import { ChevronRight, BarChart3, Sparkles, Flame, AlertTriangle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useApp } from '../lib/AppContext';
 import { TaskDetailModal } from '../components/TaskDetailModal';
 import { CoachmarksOverlay } from '../components/CoachmarksOverlay';
+import { NotificationCenter } from '../components/NotificationCenter';
 import { supabase } from '../lib/supabase';
 import type { Task } from '../lib/supabase';
 
@@ -48,7 +49,7 @@ function getProgress(task: Task) {
 
 // ── Main Component ─────────────────────────────────────────────
 export function DashboardScreen() {
-  const { user, profile, tasks, meals, sleepLogs, notificationCount, setScreen, refreshTasks } = useApp();
+  const { user, profile, tasks, meals, sleepLogs, setScreen, refreshTasks } = useApp();
   const rootRef = useRef<HTMLDivElement | null>(null);
   const constraintsRef = useRef<HTMLDivElement | null>(null);
 
@@ -177,15 +178,7 @@ export function DashboardScreen() {
           <div className="flex flex-col items-end gap-2">
             <p className="text-2xl font-black text-white tracking-wider font-mono">{timeStr}</p>
             <div className="flex items-center gap-2">
-              <button className="relative p-2 rounded-full" style={{ background: 'rgba(255,255,255,0.08)' }}>
-                <Bell size={18} className="text-white" />
-                {notificationCount > 0 && (
-                  <span className="absolute top-0.5 right-0.5 rounded-full flex items-center justify-center text-white text-[8px] font-bold"
-                    style={{ background: '#d93025', width: 14, height: 14 }}>
-                    {notificationCount}
-                  </span>
-                )}
-              </button>
+              <NotificationCenter />
               <button onClick={() => setScreen('tracking')} data-coachmark="stats"
                 className="relative p-2 rounded-full" style={{ background: 'rgba(148,212,0,0.15)' }}>
                 <BarChart3 size={18} style={{ color: '#94d400' }} />
