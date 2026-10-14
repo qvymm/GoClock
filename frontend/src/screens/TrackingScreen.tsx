@@ -156,7 +156,7 @@ export function TrackingScreen() {
       goalRate: monthTasks.length ? Math.round(completed / monthTasks.length * 100) : 0,
       avgSleepHours: monthSleep.length ? Math.round(monthSleep.reduce((sum, log) => sum + (log.duration_minutes || 0), 0) / monthSleep.length / 60 * 10) / 10 : 0,
       avgCalories: monthMeals.length ? Math.round(monthMeals.reduce((sum, meal) => sum + (meal.calories || 0), 0) / monthMeals.length) : 0,
-      bestHabit: monthTasks.length || monthSleep.length || monthMeals.length ? 'Dá»¯ liá»‡u Ä‘Ã£ ghi nháº­n' : 'ChÆ°a cÃ³ dá»¯ liá»‡u',
+      bestHabit: monthTasks.length || monthSleep.length || monthMeals.length ? 'Dữ liệu đã ghi nhận' : 'Chưa có dữ liệu',
       achievements: [],
       weightChange: null,
     };
@@ -172,39 +172,39 @@ export function TrackingScreen() {
     // Task insights
     const taskRate = dailyStats.tasksCompleted / Math.max(1, dailyStats.tasksTotal);
     if (taskRate >= 0.8) {
-      strengths.push({ area: 'NÄƒng suáº¥t', detail: 'Tá»· lá»‡ hoÃ n thÃ nh task cao (80%+)', icon: 'ðŸŽ¯' });
+      strengths.push({ area: 'Năng suất', detail: 'Tỷ lệ hoàn thành task cao (80%+)', icon: '🎯' });
     } else if (taskRate < 0.5) {
-      improvements.push({ area: 'NÄƒng suáº¥t', detail: 'Tá»· lá»‡ task hoÃ n thÃ nh cÃ²n tháº¥p', icon: 'ðŸ“‰' });
-      suggestions.push('Thá»­ chia nhá» task lá»›n thÃ nh cÃ¡c bÆ°á»›c cá»¥ thá»ƒ hÆ¡n');
+      improvements.push({ area: 'Năng suất', detail: 'Tỷ lệ task hoàn thành còn thấp', icon: '📉' });
+      suggestions.push('Thử chia nhỏ task lớn thành các bước cụ thể hơn');
     }
 
     // Sleep insights
     if (dailyStats.sleepMinutes >= 420) {
-      strengths.push({ area: 'Giáº¥c ngá»§', detail: 'Báº¡n Ä‘ang ngá»§ Ä‘á»§ giáº¥c (7h+)', icon: 'ðŸ˜´' });
+      strengths.push({ area: 'Giấc ngủ', detail: 'Bạn đang ngủ đủ giấc (7h+)', icon: '😴' });
     } else {
-      improvements.push({ area: 'Giáº¥c ngá»§', detail: 'Giáº¥c ngá»§ dÆ°á»›i má»©c khuyáº¿n nghá»‹', icon: 'ðŸŒ™' });
-      suggestions.push('Cá»‘ gáº¯ng Ä‘i ngá»§ sá»›m hÆ¡n 30 phÃºt má»—i Ä‘Ãªm');
+      improvements.push({ area: 'Giấc ngủ', detail: 'Giấc ngủ dưới mức khuyến nghị', icon: '🌙' });
+      suggestions.push('Cố gắng đi ngủ sớm hơn 30 phút mỗi đêm');
     }
 
     // Nutrition insights
     const targetCal = profile?.tdee || 0;
     if (targetCal > 0 && dailyStats.calories >= targetCal * 0.8 && dailyStats.calories <= targetCal * 1.1) {
-      strengths.push({ area: 'Dinh dÆ°á»¡ng', detail: 'LÆ°á»£ng calo cÃ¢n Ä‘á»‘i vá»›i má»¥c tiÃªu', icon: 'ðŸ¥—' });
+      strengths.push({ area: 'Dinh dưỡng', detail: 'Lượng calo cân đối với mục tiêu', icon: '🥗' });
     } else if (targetCal > 0 && dailyStats.calories < targetCal * 0.6) {
-      improvements.push({ area: 'Dinh dÆ°á»¡ng', detail: 'Thiáº¿u calo, cáº§n bá»• sung nÄƒng lÆ°á»£ng', icon: 'ðŸ½ï¸' });
-      suggestions.push('ThÃªm bá»¯a phá»¥ giá»¯a trÆ°a hoáº·c chiá»u');
+      improvements.push({ area: 'Dinh dưỡng', detail: 'Thiếu calo, cần bổ sung năng lượng', icon: '🍽️' });
+      suggestions.push('Thêm bữa phụ giữa trưa hoặc chiều');
     }
 
     // Protein check
     if (dailyStats.protein >= 60) {
-      strengths.push({ area: 'Protein', detail: 'Äáº¡m Ä‘á»§ cho cÆ¡ thá»ƒ hoáº¡t Ä‘á»™ng', icon: 'ðŸ’ª' });
+      strengths.push({ area: 'Protein', detail: 'Đạm đủ cho cơ thể hoạt động', icon: '💪' });
     } else {
-      improvements.push({ area: 'Protein', detail: 'Thiáº¿u Ä‘áº¡m, cáº§n thÃªm thá»±c pháº©m giÃ u protein', icon: 'ðŸ¥©' });
+      improvements.push({ area: 'Protein', detail: 'Thiếu đạm, cần thêm thực phẩm giàu protein', icon: '🥩' });
     }
 
     // Streak motivation
     if (streak >= 7) {
-      insights.push({ type: 'achievement', text: `Tuyá»‡t vá»i! Báº¡n Ä‘Ã£ duy trÃ¬ streak ${streak} ngÃ y!`, highlight: streak.toString() });
+      insights.push({ type: 'achievement', text: `Tuyệt vời! Bạn đã duy trì streak ${streak} ngày!`, highlight: streak.toString() });
     }
 
     if (tasks.length === 0 && meals.length === 0 && sleepLogs.length === 0) {
@@ -299,23 +299,23 @@ export function TrackingScreen() {
               <ArrowLeft size={20} className="text-white/70" />
             </button>
             <div>
-              <h1 className="text-xl font-bold text-white">Tiáº¿n Ä‘á»™ cá»§a tÃ´i</h1>
-              <p className="text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>Theo dÃµi hÃ nh trÃ¬nh phÃ¡t triá»ƒn</p>
+              <h1 className="text-xl font-bold text-white">Tiến độ của tôi</h1>
+              <p className="text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>Theo dõi hành trình phát triển</p>
             </div>
           </div>
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.1)' }}>
             <Fire size={16} style={{ color: '#e65100' }} />
             <span className="font-bold text-sm text-white">{streak}</span>
-            <span className="text-xs" style={{ color: 'rgba(255,255,255,0.6)' }}>ngÃ y</span>
+            <span className="text-xs" style={{ color: 'rgba(255,255,255,0.6)' }}>ngày</span>
           </div>
         </div>
 
         {/* Tab selector */}
         <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'rgba(255,255,255,0.08)' }}>
           {[
-            { id: 'daily', label: 'HÃ´m nay', icon: Sun },
-            { id: 'weekly', label: 'Tuáº§n', icon: Calendar },
-            { id: 'monthly', label: 'ThÃ¡ng', icon: BarChart3 },
+            { id: 'daily', label: 'Hôm nay', icon: Sun },
+            { id: 'weekly', label: 'Tuần', icon: Calendar },
+            { id: 'monthly', label: 'Tháng', icon: BarChart3 },
             { id: 'insights', label: 'AI', icon: Brain },
           ].map(tab => (
             <button
@@ -418,7 +418,7 @@ function DailyTrackingView({ stats, theme, profile, ProgressRing, MiniChart }: a
             </ProgressRing>
           </div>
           <p className="text-xs font-medium" style={{ color: theme === 'dark' ? '#fff' : '#202124' }}>{sleepHours}h</p>
-          <p className="text-[10px]" style={{ color: theme === 'dark' ? 'rgba(255,255,255,0.5)' : '#9aa0a6' }}>Giáº¥c ngá»§</p>
+          <p className="text-[10px]" style={{ color: theme === 'dark' ? 'rgba(255,255,255,0.5)' : '#9aa0a6' }}>Giấc ngủ</p>
         </div>
       </div>
 
@@ -428,8 +428,8 @@ function DailyTrackingView({ stats, theme, profile, ProgressRing, MiniChart }: a
           <Fire size={28} style={{ color: '#fff' }} />
         </div>
         <div className="flex-1">
-          <p className="font-bold text-white">{stats.streak} NgÃ y Streak</p>
-          <p className="text-xs text-white/80">Tiáº¿p tá»¥c duy trÃ¬ Ä‘á»ƒ Ä‘áº¡t milestone tiáº¿p theo!</p>
+          <p className="font-bold text-white">{stats.streak} Ngày Streak</p>
+          <p className="text-xs text-white/80">Tiếp tục duy trì để đạt milestone tiếp theo!</p>
         </div>
         <Trophy size={24} className="text-yellow-300" />
       </div>
@@ -438,30 +438,30 @@ function DailyTrackingView({ stats, theme, profile, ProgressRing, MiniChart }: a
       <div className="rounded-2xl p-4" style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.05)' : '#fff', border: theme === 'dark' ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(23,51,37,0.08)' }}>
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-semibold text-sm flex items-center gap-2" style={{ color: theme === 'dark' ? '#94d400' : '#173325' }}>
-            <Target size={16} /> Nhiá»‡m vá»¥ hÃ´m nay
+            <Target size={16} /> Nhiệm vụ hôm nay
           </h3>
           <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: taskRate >= 80 ? '#e6f4ea' : taskRate >= 50 ? '#fef7e0' : '#fce8e6', color: taskRate >= 80 ? '#137333' : taskRate >= 50 ? '#b06000' : '#d93025' }}>
-            {taskRate >= 80 ? 'Xuáº¥t sáº¯c' : taskRate >= 50 ? 'KhÃ¡ tá»‘t' : 'Cáº§n cá»‘ gáº¯ng'}
+            {taskRate >= 80 ? 'Xuất sắc' : taskRate >= 50 ? 'Khá tốt' : 'Cần cố gắng'}
           </span>
         </div>
         <div className="h-3 rounded-full overflow-hidden" style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0' }}>
           <div className="h-full rounded-full transition-all duration-500" style={{ width: `${taskRate}%`, background: taskRate >= 80 ? '#137333' : taskRate >= 50 ? '#b06000' : '#d93025' }} />
         </div>
         <div className="flex justify-between mt-2 text-xs" style={{ color: theme === 'dark' ? 'rgba(255,255,255,0.5)' : '#9aa0a6' }}>
-          <span>{stats.tasksCompleted} hoÃ n thÃ nh</span>
-          <span>{stats.tasksTotal - stats.tasksCompleted} cÃ²n láº¡i</span>
+          <span>{stats.tasksCompleted} hoàn thành</span>
+          <span>{stats.tasksTotal - stats.tasksCompleted} còn lại</span>
         </div>
       </div>
 
       {/* Nutrition breakdown */}
       <div className="rounded-2xl p-4" style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.05)' : '#fff', border: theme === 'dark' ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(23,51,37,0.08)' }}>
         <h3 className="font-semibold text-sm mb-4 flex items-center gap-2" style={{ color: theme === 'dark' ? '#94d400' : '#173325' }}>
-          <Flame size={16} /> Dinh dÆ°á»¡ng hÃ´m nay
+          <Flame size={16} /> Dinh dưỡng hôm nay
         </h3>
 
         {/* Calorie total */}
         <div className="flex items-center justify-between mb-1">
-          <span className="text-xs font-medium" style={{ color: theme === 'dark' ? 'rgba(255,255,255,0.6)' : '#5f6368' }}>Calo tiÃªu thá»¥</span>
+          <span className="text-xs font-medium" style={{ color: theme === 'dark' ? 'rgba(255,255,255,0.6)' : '#5f6368' }}>Calo tiêu thụ</span>
           <span className="text-xs font-bold" style={{ color: theme === 'dark' ? '#fff' : '#202124' }}>
             <span style={{ color: '#e65100' }}>{stats.calories}</span>
             {targetCal > 0 && <span style={{ color: theme === 'dark' ? 'rgba(255,255,255,0.4)' : '#9aa0a6' }}> / {targetCal} kcal</span>}
@@ -502,21 +502,21 @@ function DailyTrackingView({ stats, theme, profile, ProgressRing, MiniChart }: a
       {/* Sleep quality */}
       <div className="rounded-2xl p-4 mb-2" style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.05)' : '#fff', border: theme === 'dark' ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(23,51,37,0.08)' }}>
         <h3 className="font-semibold text-sm mb-3 flex items-center gap-2" style={{ color: theme === 'dark' ? '#94d400' : '#173325' }}>
-          <Moon size={16} /> Giáº¥c ngá»§ Ä‘Ãªm qua
+          <Moon size={16} /> Giấc ngủ đêm qua
         </h3>
         <div className="flex items-center gap-4">
           <div className="flex-1">
             <div className="flex items-baseline gap-2">
               <span className="text-3xl font-bold" style={{ color: theme === 'dark' ? '#fff' : '#202124' }}>{sleepHours}</span>
-              <span className="text-sm" style={{ color: theme === 'dark' ? 'rgba(255,255,255,0.5)' : '#9aa0a6' }}>giá»</span>
+              <span className="text-sm" style={{ color: theme === 'dark' ? 'rgba(255,255,255,0.5)' : '#9aa0a6' }}>giờ</span>
             </div>
             <div className="flex items-center gap-2 mt-1">
               <span className="text-xs px-2 py-0.5 rounded-full font-medium"
                 style={{ background: sleepHours >= 7 ? '#e6f4ea' : '#fef7e0', color: sleepHours >= 7 ? '#137333' : '#b06000' }}>
-                {sleepHours >= 7 ? 'Äá»§ giáº¥c' : 'Thiáº¿u ngá»§'}
+                {sleepHours >= 7 ? 'Đủ giấc' : 'Thiếu ngủ'}
               </span>
               <span className="text-xs" style={{ color: theme === 'dark' ? 'rgba(255,255,255,0.5)' : '#9aa0a6' }}>
-                Cháº¥t lÆ°á»£ng: {stats.sleepQuality === 'good' ? 'Tá»‘t' : stats.sleepQuality === 'fair' ? 'Trung bÃ¬nh' : 'KÃ©m'}
+                Chất lượng: {stats.sleepQuality === 'good' ? 'Tốt' : stats.sleepQuality === 'fair' ? 'Trung bình' : 'Kém'}
               </span>
             </div>
           </div>
@@ -544,16 +544,16 @@ function WeeklyTrackingView({ stats, theme, weekDays, todayStr, ProgressRing, Mi
       {/* Week overview */}
       <div className="rounded-2xl p-4" style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.05)' : '#fff', border: theme === 'dark' ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(23,51,37,0.08)' }}>
         <h3 className="font-semibold text-sm mb-3 flex items-center gap-2" style={{ color: theme === 'dark' ? '#94d400' : '#173325' }}>
-          <Calendar size={16} /> Tá»•ng quan tuáº§n nÃ y
+          <Calendar size={16} /> Tổng quan tuần này
         </h3>
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-xl p-3" style={{ background: theme === 'dark' ? 'rgba(148,212,0,0.1)' : 'rgba(23,51,37,0.05)' }}>
             <p className="text-2xl font-bold" style={{ color: theme === 'dark' ? '#94d400' : '#173325' }}>{stats.tasksCompleted}/{stats.tasksTotal}</p>
-            <p className="text-xs" style={{ color: theme === 'dark' ? 'rgba(255,255,255,0.5)' : '#9aa0a6' }}>Tasks hoÃ n thÃ nh</p>
+            <p className="text-xs" style={{ color: theme === 'dark' ? 'rgba(255,255,255,0.5)' : '#9aa0a6' }}>Tasks hoàn thành</p>
           </div>
           <div className="rounded-xl p-3" style={{ background: theme === 'dark' ? 'rgba(148,212,0,0.1)' : 'rgba(23,51,37,0.05)' }}>
             <p className="text-2xl font-bold" style={{ color: theme === 'dark' ? '#94d400' : '#173325' }}>{stats.avgSleepHours}h</p>
-            <p className="text-xs" style={{ color: theme === 'dark' ? 'rgba(255,255,255,0.5)' : '#9aa0a6' }}>Trung bÃ¬nh ngá»§/ngÃ y</p>
+            <p className="text-xs" style={{ color: theme === 'dark' ? 'rgba(255,255,255,0.5)' : '#9aa0a6' }}>Trung bình ngủ/ngày</p>
           </div>
         </div>
       </div>
@@ -561,7 +561,7 @@ function WeeklyTrackingView({ stats, theme, weekDays, todayStr, ProgressRing, Mi
       {/* Daily chart */}
       <div className="rounded-2xl p-4" style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.05)' : '#fff', border: theme === 'dark' ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(23,51,37,0.08)' }}>
         <h3 className="font-semibold text-sm mb-3 flex items-center gap-2" style={{ color: theme === 'dark' ? '#94d400' : '#173325' }}>
-          <BarChart3 size={16} /> Hiá»‡u suáº¥t theo ngÃ y
+          <BarChart3 size={16} /> Hiệu suất theo ngày
         </h3>
         <div className="flex gap-1 mb-2">
           {weekDays.map((d: Date, i: number) => {
@@ -576,7 +576,7 @@ function WeeklyTrackingView({ stats, theme, weekDays, todayStr, ProgressRing, Mi
         </div>
         <div className="text-center">
           <span className="text-xs" style={{ color: theme === 'dark' ? 'rgba(255,255,255,0.5)' : '#9aa0a6' }}>
-            NgÃ y tá»‘t nháº¥t: <strong style={{ color: theme === 'dark' ? '#94d400' : '#173325' }}>{stats.bestDay}</strong>
+            Ngày tốt nhất: <strong style={{ color: theme === 'dark' ? '#94d400' : '#173325' }}>{stats.bestDay}</strong>
           </span>
         </div>
       </div>
@@ -584,12 +584,12 @@ function WeeklyTrackingView({ stats, theme, weekDays, todayStr, ProgressRing, Mi
       {/* Comparison with last week */}
       <div className="rounded-2xl p-4" style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.05)' : '#fff', border: theme === 'dark' ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(23,51,37,0.08)' }}>
         <h3 className="font-semibold text-sm mb-3 flex items-center gap-2" style={{ color: theme === 'dark' ? '#94d400' : '#173325' }}>
-          <TrendingUp size={16} /> So vá»›i tuáº§n trÆ°á»›c
+          <TrendingUp size={16} /> So với tuần trước
         </h3>
         {[
-          { label: 'Tasks hoÃ n thÃ nh', value: stats.comparisonTasks, icon: CheckCircle2, color: stats.comparisonTasks >= 0 ? '#137333' : '#d93025' },
-          { label: 'Giá» ngá»§ TB', value: stats.comparisonSleep, icon: Moon, color: stats.comparisonSleep >= 0 ? '#137333' : '#d93025' },
-          { label: 'Calo tiÃªu thá»¥', value: stats.comparisonCalories, icon: Flame, color: '#1967d2' },
+          { label: 'Tasks hoàn thành', value: stats.comparisonTasks, icon: CheckCircle2, color: stats.comparisonTasks >= 0 ? '#137333' : '#d93025' },
+          { label: 'Giờ ngủ TB', value: stats.comparisonSleep, icon: Moon, color: stats.comparisonSleep >= 0 ? '#137333' : '#d93025' },
+          { label: 'Calo tiêu thụ', value: stats.comparisonCalories, icon: Flame, color: '#1967d2' },
         ].map(item => (
           <div key={item.label} className="flex items-center gap-3 py-2" style={{ borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.08)' : '#f0f0f0'}` }}>
             <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${item.color}20` }}>
@@ -609,7 +609,7 @@ function WeeklyTrackingView({ stats, theme, weekDays, todayStr, ProgressRing, Mi
       {/* Habit consistency */}
       <div className="rounded-2xl p-4 mb-2" style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.05)' : '#fff', border: theme === 'dark' ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(23,51,37,0.08)' }}>
         <h3 className="font-semibold text-sm mb-3 flex items-center gap-2" style={{ color: theme === 'dark' ? '#94d400' : '#173325' }}>
-          <Activity size={16} /> Äiá»ƒm duy trÃ¬ thÃ³i quen
+          <Activity size={16} /> Điểm duy trì thói quen
         </h3>
         <div className="flex items-center gap-4">
           <div className="flex justify-center">
@@ -618,9 +618,9 @@ function WeeklyTrackingView({ stats, theme, weekDays, todayStr, ProgressRing, Mi
             </ProgressRing>
           </div>
           <div className="flex-1">
-            <p className="text-xs mb-2" style={{ color: theme === 'dark' ? 'rgba(255,255,255,0.5)' : '#9aa0a6' }}>ÄÃ¡nh giÃ¡:</p>
+            <p className="text-xs mb-2" style={{ color: theme === 'dark' ? 'rgba(255,255,255,0.5)' : '#9aa0a6' }}>Đánh giá:</p>
             <p className="text-sm font-medium" style={{ color: theme === 'dark' ? '#fff' : '#202124' }}>
-              {stats.habitScore >= 80 ? 'Xuáº¥t sáº¯c! Báº¡n Ä‘ang duy trÃ¬ ráº¥t tá»‘t.' : stats.habitScore >= 60 ? 'Tá»‘t. Tiáº¿p tá»¥c cá»‘ gáº¯ng!' : 'Cáº§n cáº£i thiá»‡n tÃ­nh nháº¥t quÃ¡n.'}
+              {stats.habitScore >= 80 ? 'Xuất sắc! Bạn đang duy trì rất tốt.' : stats.habitScore >= 60 ? 'Tốt. Tiếp tục cố gắng!' : 'Cần cải thiện tính nhất quán.'}
             </p>
           </div>
         </div>
@@ -637,21 +637,21 @@ function MonthlyTrackingView({ stats, theme, badges, milestones, ProgressRing }:
       <div className="rounded-2xl p-4" style={{ background: 'linear-gradient(135deg, #173325 0%, #2d6a40 100%)' }}>
         <div className="flex items-center gap-3 mb-3">
           <Crown size={20} style={{ color: '#94d400' }} />
-          <h3 className="font-bold text-white">Tá»•ng káº¿t thÃ¡ng</h3>
+          <h3 className="font-bold text-white">Tổng kết tháng</h3>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-xl p-3 text-center" style={{ background: 'rgba(255,255,255,0.1)' }}>
             <p className="text-2xl font-bold text-white">{stats.tasksCompleted}</p>
-            <p className="text-xs text-white/60">Tasks hoÃ n thÃ nh</p>
+            <p className="text-xs text-white/60">Tasks hoàn thành</p>
           </div>
           <div className="rounded-xl p-3 text-center" style={{ background: 'rgba(255,255,255,0.1)' }}>
             <p className="text-2xl font-bold" style={{ color: '#94d400' }}>{stats.goalRate}%</p>
-            <p className="text-xs text-white/60">Tá»· lá»‡ má»¥c tiÃªu</p>
+            <p className="text-xs text-white/60">Tỷ lệ mục tiêu</p>
           </div>
         </div>
         {stats.weightChange !== null && (
           <div className="mt-3 flex items-center justify-center gap-2 text-sm">
-            <span className="text-white/60">CÃ¢n náº·ng:</span>
+            <span className="text-white/60">Cân nặng:</span>
             <span className="font-bold" style={{ color: stats.weightChange < 0 ? '#ef4444' : '#137333' }}>
               {stats.weightChange < 0 ? '' : '+'}{stats.weightChange}kg
             </span>
@@ -662,7 +662,7 @@ function MonthlyTrackingView({ stats, theme, badges, milestones, ProgressRing }:
       {/* Badges earned */}
       <div className="rounded-2xl p-4" style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.05)' : '#fff', border: theme === 'dark' ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(23,51,37,0.08)' }}>
         <h3 className="font-semibold text-sm mb-3 flex items-center gap-2" style={{ color: theme === 'dark' ? '#94d400' : '#173325' }}>
-          <Award size={16} /> Huy hiá»‡u Ä‘áº¡t Ä‘Æ°á»£c
+          <Award size={16} /> Huy hiệu đạt được
         </h3>
         <div className="flex flex-wrap gap-2">
           {badges.map((badge: Badge) => (
@@ -707,7 +707,7 @@ function MonthlyTrackingView({ stats, theme, badges, milestones, ProgressRing }:
             <Star size={24} style={{ color: '#94d400' }} />
           </div>
           <div>
-            <p className="text-xs" style={{ color: theme === 'dark' ? 'rgba(255,255,255,0.5)' : '#9aa0a6' }}>ThÃ³i quen tá»‘t nháº¥t thÃ¡ng</p>
+            <p className="text-xs" style={{ color: theme === 'dark' ? 'rgba(255,255,255,0.5)' : '#9aa0a6' }}>Thói quen tốt nhất tháng</p>
             <p className="font-semibold" style={{ color: theme === 'dark' ? '#fff' : '#202124' }}>{stats.bestHabit}</p>
           </div>
         </div>
@@ -728,12 +728,12 @@ function InsightsView({ insights, theme, streak, dailyStats }: any) {
           </div>
           <div>
             <p className="font-bold text-white">AI Insights</p>
-            <p className="text-xs text-white/70">PhÃ¢n tÃ­ch cÃ¡ nhÃ¢n hÃ³a</p>
+            <p className="text-xs text-white/70">Phân tích cá nhân hóa</p>
           </div>
           <Sparkles size={20} className="text-yellow-300 ml-auto" />
         </div>
         <p className="text-sm text-white/90 leading-relaxed">
-          Dá»±a trÃªn dá»¯ liá»‡u hoáº¡t Ä‘á»™ng cá»§a báº¡n, tÃ´i Ä‘Ã£ phÃ¢n tÃ­ch vÃ  Ä‘Æ°a ra má»™t sá»‘ nháº­n Ä‘á»‹nh sau:
+          Dựa trên dữ liệu hoạt động của bạn, tôi đã phân tích và đưa ra một số nhận định sau:
         </p>
       </div>
 
@@ -748,7 +748,7 @@ function InsightsView({ insights, theme, streak, dailyStats }: any) {
       {/* Strengths */}
       <div className="rounded-2xl p-4" style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.05)' : '#fff', border: theme === 'dark' ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(23,51,37,0.08)' }}>
         <h3 className="font-semibold text-sm mb-3 flex items-center gap-2" style={{ color: '#137333' }}>
-          <Trophy size={16} /> Äiá»ƒm máº¡nh
+          <Trophy size={16} /> Điểm mạnh
         </h3>
         {insights.strengths.map((s: any, i: number) => (
           <div key={i} className="flex items-center gap-3 py-2" style={{ borderBottom: i < insights.strengths.length - 1 ? `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.08)' : '#f0f0f0'}` : 'none' }}>
@@ -764,7 +764,7 @@ function InsightsView({ insights, theme, streak, dailyStats }: any) {
       {/* Areas to improve */}
       <div className="rounded-2xl p-4" style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.05)' : '#fff', border: theme === 'dark' ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(23,51,37,0.08)' }}>
         <h3 className="font-semibold text-sm mb-3 flex items-center gap-2" style={{ color: '#e65100' }}>
-          <Target size={16} /> Cáº§n cáº£i thiá»‡n
+          <Target size={16} /> Cần cải thiện
         </h3>
         {insights.improvements.length > 0 ? insights.improvements.map((imp: any, i: number) => (
           <div key={i} className="flex items-center gap-3 py-2" style={{ borderBottom: i < insights.improvements.length - 1 ? `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.08)' : '#f0f0f0'}` : 'none' }}>
@@ -775,7 +775,7 @@ function InsightsView({ insights, theme, streak, dailyStats }: any) {
             </div>
           </div>
         )) : (
-          <p className="text-sm text-center py-2" style={{ color: theme === 'dark' ? 'rgba(255,255,255,0.5)' : '#9aa0a6' }}>Tuyá»‡t vá»i! KhÃ´ng cÃ³ Ä‘iá»ƒm yáº¿u Ä‘Ã¡ng ká»ƒ.</p>
+          <p className="text-sm text-center py-2" style={{ color: theme === 'dark' ? 'rgba(255,255,255,0.5)' : '#9aa0a6' }}>Tuyệt vời! Không có điểm yếu đáng kể.</p>
         )}
       </div>
 
@@ -783,7 +783,7 @@ function InsightsView({ insights, theme, streak, dailyStats }: any) {
       {insights.suggestions.length > 0 && (
         <div className="rounded-2xl p-4" style={{ background: 'linear-gradient(135deg, #0f2a1a 0%, #173325 100%)' }}>
           <h3 className="font-semibold text-sm mb-3 flex items-center gap-2 text-white">
-            <Sparkles size={16} style={{ color: '#94d400' }} /> Gá»£i Ã½ hÃ nh Ä‘á»™ng
+            <Sparkles size={16} style={{ color: '#94d400' }} /> Gợi ý hành động
           </h3>
           {insights.suggestions.map((s: string, i: number) => (
             <div key={i} className="flex items-start gap-2 py-2">
@@ -797,14 +797,14 @@ function InsightsView({ insights, theme, streak, dailyStats }: any) {
       {/* Productivity score */}
       <div className="rounded-2xl p-4" style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.05)' : '#fff', border: theme === 'dark' ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(23,51,37,0.08)' }}>
         <h3 className="font-semibold text-sm mb-3 flex items-center gap-2" style={{ color: theme === 'dark' ? '#94d400' : '#173325' }}>
-          <Activity size={16} /> Äiá»ƒm nÄƒng suáº¥t
+          <Activity size={16} /> Điểm năng suất
         </h3>
         <div className="flex items-center justify-center gap-6">
           <div className="text-center">
             <div className="w-20 h-20 rounded-2xl flex items-center justify-center mb-2" style={{ background: 'rgba(148,212,0,0.15)' }}>
               <span className="text-2xl font-bold" style={{ color: '#94d400' }}>82</span>
             </div>
-            <p className="text-xs" style={{ color: theme === 'dark' ? 'rgba(255,255,255,0.5)' : '#9aa0a6' }}>NÄƒng suáº¥t</p>
+            <p className="text-xs" style={{ color: theme === 'dark' ? 'rgba(255,255,255,0.5)' : '#9aa0a6' }}>Năng suất</p>
           </div>
           <div className="text-center">
             <div className="w-20 h-20 rounded-2xl flex items-center justify-center mb-2" style={{ background: 'rgba(25,103,210,0.15)' }}>
