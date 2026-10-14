@@ -5,13 +5,10 @@ import {
   CalendarDays,
   CircleDot,
   CreditCard,
-  LayoutDashboard,
-  LogOut,
   MessageSquare,
   PieChart,
   Search,
   Send,
-  Settings,
   Star,
   User,
   UserCheck,
@@ -24,6 +21,9 @@ import {
 } from 'lucide-react';
 import { useApp } from '../lib/AppContext';
 import { supabase } from '../lib/supabase';
+import { useAdminStats } from '../hooks/useAdminStats';
+import { ChartCard, KpiCard, RevenueTooltip } from '../components/admin/AdminDashboardWidgets';
+import { AdminLayout } from '../components/admin/AdminLayout';
 import {
   LineChart,
   Line,
@@ -36,15 +36,6 @@ import {
   Pie,
   Cell,
 } from 'recharts';
-
-const sidebarItems = [
-  { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, emoji: '🏠' },
-  { key: 'users', label: 'User Management', icon: User, emoji: '👥' },
-  { key: 'subscriptions', label: 'Subscription Management', icon: Star, emoji: '⭐' },
-  { key: 'analytics', label: 'Analytics', icon: PieChart, emoji: '📊' },
-  { key: 'notifications', label: 'Notification Management', icon: Bell, emoji: '🔔' },
-  { key: 'settings', label: 'Settings', icon: Settings, emoji: '⚙️' },
-];
 
 const userGrowthData = [
   { month: 'Jan', users: 8200 },
@@ -126,6 +117,7 @@ const taskCompletionData = [
 
 export function AdminDashboardScreen() {
   const { logout } = useApp();
+  const { stats: dashboardStats, isUsingMockData } = useAdminStats();
   const [activeSection, setActiveSection] = useState('dashboard');
   const [search, setSearch] = useState('');
   const [analyticsTab, setAnalyticsTab] = useState<'task' | 'meal' | 'sleep' | 'retention'>('task');
@@ -136,56 +128,17 @@ export function AdminDashboardScreen() {
   const [userRows, setUserRows] = useState<UserRow[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
 
-  const [dashboardStats, setDashboardStats] = useState({
-    totalUsers: 0,
-    totalTasks: 0,
-    totalMeals: 0,
-    totalSleepLogs: 0,
-    completedTasks: 0,
-  });
-
-  useEffect(() => {
-    async function fetchStats() {
-      try {
-        const [
-          { count: userCount },
-          { count: taskCount },
-          { count: mealCount },
-          { count: sleepCount },
-          { count: completedTaskCount },
-        ] = await Promise.all([
-          supabase.from('profiles').select('*', { count: 'exact', head: true }),
-          supabase.from('tasks').select('*', { count: 'exact', head: true }),
-          supabase.from('meals').select('*', { count: 'exact', head: true }),
-          supabase.from('sleep_logs').select('*', { count: 'exact', head: true }),
-          supabase.from('tasks').select('*', { count: 'exact', head: true }).eq('status', 'completed'),
-        ]);
-
-        setDashboardStats({
-          totalUsers: userCount || 0,
-          totalTasks: taskCount || 0,
-          totalMeals: mealCount || 0,
-          totalSleepLogs: sleepCount || 0,
-          completedTasks: completedTaskCount || 0,
-        });
-      } catch (e) {
-        console.error('Error fetching dashboard stats:', e);
-      }
-    }
-    fetchStats();
-  }, []);
-
   useEffect(() => {
     async function fetchUsers() {
       setLoadingUsers(true);
       try {
-        const { data, error } = await supabase.from('profiles').select('id, full_name, nickname, username, email');
+        const { data, error } = await supabase.from('profiles').select('id, full_name, nickname, username');
         if (error) throw error;
         if (data) {
           const mapped: UserRow[] = data.map((profile: any) => ({
             id: profile.id,
             name: profile.full_name || profile.nickname || profile.username || 'Unknown',
-            email: profile.email || 'user@example.com', // Will use real email if available in profiles table
+            email: '—',
             plan: 'Free', // Placeholder
             status: 'Active', // Placeholder
           }));
@@ -251,176 +204,63 @@ export function AdminDashboardScreen() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
-      <div className="flex min-h-screen flex-col md:flex-row">
-        <aside className="w-full border-b border-slate-200 bg-white md:w-[250px] md:border-r md:border-b-0 md:min-h-screen">
-          <div className="sticky top-0 z-10 border-b border-slate-200 bg-white px-6 py-5 md:border-b md:border-r md:border-slate-200 md:pb-6 md:pt-7">
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600 text-white text-lg font-black shadow-sm">G</div>
-              <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">GoClock Admin</p>
-                <h1 className="text-lg font-semibold text-slate-900">Admin Dashboard</h1>
-              </div>
-            </div>
-          </div>
-
-          <div className="px-4 py-5">
-            <nav className="space-y-1">
-              {sidebarItems.map((item) => {
-                const Icon = item.icon;
-                const active = activeSection === item.key;
-                return (
-                  <button
-                    key={item.key}
-                    onClick={() => {
-                      setActiveSection(item.key);
-                      if (item.key === 'analytics') setAnalyticsTab('task');
-                    }}
-                    className={`group flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-medium transition ${active ? 'bg-slate-100 text-slate-900 shadow-sm' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
-                  >
-                    <span className="text-base">{item.emoji}</span>
-                    <Icon size={18} className="shrink-0" />
-                    {item.label}
-                  </button>
-                );
-              })}
-            </nav>
-          </div>
-
-          <div className="mt-auto border-t border-slate-200 px-6 py-5">
-            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Need help?</p>
-              <p className="mt-2 text-sm font-semibold text-slate-900">Contact support team</p>
-              <button className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-2 text-white shadow-sm transition hover:bg-blue-700">
-                <MessageSquare size={16} /> Support
-              </button>
-            </div>
-          </div>
-        </aside>
-
-        <main className="flex-1 bg-slate-50 px-4 py-5 md:px-8 md:py-8">
-          <header className="mb-8 flex flex-col gap-4 rounded-3xl bg-white p-6 shadow-sm md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">GoClock Admin</p>
-              <h2 className="mt-2 text-2xl font-semibold text-slate-900">Quản lý toàn bộ ứng dụng</h2>
-              <p className="mt-1 text-sm text-slate-600">Xem báo cáo, quản lý người dùng, gói đăng ký và gửi thông báo.</p>
-            </div>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <div className="inline-flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 text-white">A</div>
-                <div>
-                  <p className="text-sm font-semibold text-slate-900">Admin</p>
-                  <p className="text-xs text-slate-500">Administrator</p>
-                </div>
-              </div>
-              <button
-                onClick={logout}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
-              >
-                <LogOut size={16} /> Logout
-              </button>
-            </div>
-          </header>
-
+    <AdminLayout activeSection={activeSection} onLogout={() => void logout()} onNavigate={section => {
+      setActiveSection(section);
+      if (section === 'analytics') setAnalyticsTab('task');
+    }}>
           {activeSection === 'dashboard' && (
             <section className="space-y-6">
+              {isUsingMockData && (
+                <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-medium text-amber-800">
+                  Đang hiển thị số liệu demo. Kết nối Supabase và dữ liệu thực sẽ được ưu tiên khi có sẵn.
+                </p>
+              )}
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-100 text-sky-600">
-                      <User size={20} />
-                    </div>
-                    <div className="rounded-2xl bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Users</div>
-                  </div>
-                  <p className="mt-6 text-3xl font-semibold text-slate-900">{dashboardStats.totalUsers.toLocaleString()}</p>
-                  <p className="mt-2 text-sm text-slate-500">Total users registered</p>
-                </div>
-                <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600">
-                      <UserCheck size={20} />
-                    </div>
-                    <div className="rounded-2xl bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Active</div>
-                  </div>
-                  <p className="mt-6 text-3xl font-semibold text-slate-900">{dashboardStats.totalUsers.toLocaleString()}</p>
-                  <p className="mt-2 text-sm text-slate-500">Active users today</p>
-                </div>
-                <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-100 text-orange-600">
-                      <Star size={20} />
-                    </div>
-                    <div className="rounded-2xl bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Premium</div>
-                  </div>
-                  <p className="mt-6 text-3xl font-semibold text-slate-900">0</p>
-                  <p className="mt-2 text-sm text-slate-500">Premium users</p>
-                </div>
-                <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-100 text-violet-600">
-                      <Wallet size={20} />
-                    </div>
-                    <div className="rounded-2xl bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Revenue</div>
-                  </div>
-                  <p className="mt-6 text-3xl font-semibold text-slate-900">0 VNĐ</p>
-                  <p className="mt-2 text-sm text-slate-500">Monthly recurring revenue</p>
-                </div>
+                <KpiCard label="Users" value={dashboardStats.totalUsers.toLocaleString('vi-VN')}
+                  description="Total users registered" icon={User} iconClass="bg-sky-50 text-sky-600" />
+                <KpiCard label="Active" value={dashboardStats.activeUsersToday.toLocaleString('vi-VN')}
+                  description="Active users today" icon={UserCheck} iconClass="bg-teal-50 text-teal-600" />
+                <KpiCard label="Premium" value={dashboardStats.premiumUsers.toLocaleString('vi-VN')}
+                  description="Premium users" icon={Star} iconClass="bg-orange-50 text-orange-600" />
+                <KpiCard label="Revenue" value={`${dashboardStats.monthlyRevenue.toLocaleString('vi-VN')} VNĐ`}
+                  description="Monthly recurring revenue" icon={Wallet} iconClass="bg-violet-50 text-violet-600" />
               </div>
 
               <div className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
                 <div className="grid gap-4 md:grid-cols-2">
-                  <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-slate-900">User Growth</p>
-                        <p className="mt-1 text-sm text-slate-500">Jan - Jun</p>
-                      </div>
-                      <TrendingUp size={20} className="text-blue-600" />
-                    </div>
-                    <div className="mt-6 h-64">
+                  <ChartCard title="User Growth" description="Jan - Jun" icon={TrendingUp}>
+                    <div className="mt-5 h-64">
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={userGrowthData} margin={{ top: 10, right: 0, left: -10, bottom: 0 }}>
                           <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
                           <XAxis dataKey="month" tickLine={false} axisLine={false} />
-                          <YAxis tickFormatter={(value) => `${value / 1000}k`} tickLine={false} axisLine={false} />
+                          <YAxis domain={[0, 14000]} ticks={[0, 2000, 4000, 6000, 8000, 10000, 12000, 14000]}
+                            tickFormatter={(value) => `${value / 1000}k`} tickLine={false} axisLine={false} />
                           <Tooltip formatter={(value: number) => value.toLocaleString()} />
                           <Line type="monotone" dataKey="users" stroke="#2563eb" strokeWidth={3} dot={{ r: 4 }} />
                         </LineChart>
                       </ResponsiveContainer>
                     </div>
-                  </div>
+                  </ChartCard>
 
-                  <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-slate-900">Revenue Trend</p>
-                        <p className="mt-1 text-sm text-slate-500">Jan - Jun</p>
-                      </div>
-                      <CreditCard size={20} className="text-emerald-600" />
-                    </div>
-                    <div className="mt-6 h-64">
+                  <ChartCard title="Revenue Trend" description="Jan - Jun" icon={CreditCard}>
+                    <div className="mt-5 h-64">
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={revenueTrend} margin={{ top: 10, right: 0, left: -10, bottom: 0 }}>
                           <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
                           <XAxis dataKey="month" tickLine={false} axisLine={false} />
-                          <YAxis tickFormatter={(value) => `${value / 1000000}M`} tickLine={false} axisLine={false} />
-                          <Tooltip formatter={(value: number) => `${value.toLocaleString()} VNĐ`} />
+                          <YAxis domain={[0, 60_000_000]} ticks={[0, 10_000_000, 20_000_000, 30_000_000, 40_000_000, 50_000_000, 60_000_000]}
+                            tickFormatter={(value) => `${value / 1_000_000}M`} tickLine={false} axisLine={false} />
+                          <Tooltip content={<RevenueTooltip />} />
                           <Line type="monotone" dataKey="revenue" stroke="#16a34a" strokeWidth={3} dot={{ r: 4 }} />
                         </LineChart>
                       </ResponsiveContainer>
                     </div>
-                  </div>
+                  </ChartCard>
                 </div>
 
-                <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900">Feature Usage</p>
-                      <p className="mt-1 text-sm text-slate-500">Task, Meal, Sleep</p>
-                    </div>
-                    <CircleDot size={20} className="text-slate-500" />
-                  </div>
-                  <div className="mt-6 flex flex-col items-center gap-4 md:flex-row md:items-end md:justify-between">
+                <ChartCard title="Feature Usage" description="Task, Meal, Sleep" icon={CircleDot}>
+                  <div className="mt-5 flex flex-col items-center gap-4 md:flex-row md:items-end md:justify-between">
                     <div className="h-56 w-full md:w-1/2">
                       <ResponsiveContainer width="100%" height="100%">
                         <RechartPieChart>
@@ -445,7 +285,7 @@ export function AdminDashboardScreen() {
                         </div>
                       ))}
                     </div>
-                  </div>
+                  </ChartCard>
                 </div>
               </div>
             </section>
@@ -796,8 +636,6 @@ export function AdminDashboardScreen() {
               </div>
             </section>
           )}
-        </main>
-      </div>
-    </div>
+    </AdminLayout>
   );
 }

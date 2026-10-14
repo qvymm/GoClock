@@ -28,7 +28,7 @@ type AppContextType = {
   setScreen: (s: AppScreen) => void;
   isAuthenticated: boolean;
   isAdmin: boolean;
-  loginAdmin: (email: string, password: string) => boolean;
+  loginAdmin: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
   user: User | null;
   profile: Profile | null;
   setProfile: (p: Profile | null) => void;
@@ -70,18 +70,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return;
       }
       if (u) {
-        loadProfile(u.id);
+        void loadProfile(u.id);
       } else {
+        setIsAdmin(false);
         setProfile(null);
         setTasks([]);
         setMeals([]);
         setSleepLogs([]);
+        setScreen('login');
       }
     });
     return () => subscription.unsubscribe();
   }, []);
 
   async function loadProfile(userId: string) {
+    const { data: admin, error: adminError } = await supabase
+      .from('admin_users')
+      .select('user_id')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (adminError) {
+      console.error('Unable to check admin access:', adminError);
+    }
+    if (admin) {
+      setIsAdmin(true);
+      setProfile(null);
+      setScreen('adminDashboard');
+      return;
+    }
+
+    setIsAdmin(false);
     const { data } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
     const loadedProfile = data as Profile | null;
     setProfile(loadedProfile);
@@ -134,14 +152,43 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [user]);
 
-  function loginAdmin(email: string, password: string) {
-    const isValid = email === 'admin@goclock.com' && password === 'admin';
-    if (isValid) {
+  async function loginAdmin(email: string, password: string) {
+    if (!isSupabaseEnabled) {
+      return { success: false, message: 'Supabase chưa được cấu hình cho ứng dụng.' };
+    }
+
+    try {
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      if (signInError || !data.user) {
+        return { success: false, message: 'Sai email hoặc mật khẩu.' };
+      }
+
+      const { data: admin, error: adminError } = await supabase
+        .from('admin_users')
+        .select('user_id')
+        .eq('user_id', data.user.id)
+        .maybeSingle();
+
+      if (adminError) {
+        console.error('Unable to verify admin account:', adminError);
+        await supabase.auth.signOut();
+        return { success: false, message: 'Không thể xác minh quyền admin. Hãy kiểm tra migration admin_users trong Supabase.' };
+      }
+      if (!admin) {
+        await supabase.auth.signOut();
+        return { success: false, message: 'Tài khoản này chưa được cấp quyền admin.' };
+      }
+
+      setUser(data.user);
+      setProfile(null);
       setIsAuthenticated(true);
       setIsAdmin(true);
       setScreen('adminDashboard');
+      return { success: true };
+    } catch (error) {
+      console.error('Admin sign-in failed:', error);
+      return { success: false, message: 'Đăng nhập admin thất bại. Hãy kiểm tra kết nối rồi thử lại.' };
     }
-    return isValid;
   }
 
   async function logout() {

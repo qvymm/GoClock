@@ -36,7 +36,7 @@ export function LoginScreen() {
 
   async function handleLogin() {
     if (!credential || !password) { setError('Vui lòng nhập đầy đủ thông tin'); return; }
-    if (!isSupabaseEnabled && !(credential === 'admin@goclock.com' && password === 'admin')) {
+    if (!isSupabaseEnabled) {
       setError('Chưa cấu hình dịch vụ đăng nhập. Vui lòng thiết lập Supabase cho ứng dụng trước.');
       return;
     }
@@ -44,10 +44,10 @@ export function LoginScreen() {
     setError('');
     const email = credential.includes('@') ? credential : credential + '@goclock.com';
 
-    if (email === 'admin@goclock.com' && password === 'admin') {
-      const success = loginAdmin(email, password);
+    if (email.toLowerCase() === 'admin@goclock.com') {
+      const result = await loginAdmin(email, password);
       setLoading(false);
-      if (!success) setError('Sai tài khoản hoặc mật khẩu');
+      if (!result.success) setError(result.message ?? 'Không thể đăng nhập admin.');
       return;
     }
 

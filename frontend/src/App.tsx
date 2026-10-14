@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { AppProvider, useApp } from './lib/AppContext';
 
 import { SplashScreen } from './screens/SplashScreen';
@@ -23,8 +23,12 @@ import { BottomNav } from './components/BottomNav';
 const APP_SCREENS = ['dashboard', 'calendar', 'nutrition', 'sleep', 'profile'];
 
 function AppInner() {
-  const { screen } = useApp();
+  const { screen, isAdmin, setScreen } = useApp();
   const showNav = APP_SCREENS.includes(screen);
+
+  useEffect(() => {
+    if (screen === 'adminDashboard' && !isAdmin) setScreen('login');
+  }, [screen, isAdmin, setScreen]);
 
   function renderScreen() {
     switch (screen) {
@@ -35,7 +39,7 @@ function AppInner() {
       case 'onboarding': return <OnboardingScreen />;
       case 'forgotPassword': return <ForgotPasswordScreen />;
       case 'resetPassword': return <ForgotPasswordScreen />;
-      case 'adminDashboard': return <AdminDashboardScreen />;
+      case 'adminDashboard': return isAdmin ? <AdminDashboardScreen /> : <LoginScreen />;
       case 'dashboard': return <DashboardScreen />;
       case 'calendar': return <CalendarScreen />;
       case 'nutrition': return <NutritionScreen />;
