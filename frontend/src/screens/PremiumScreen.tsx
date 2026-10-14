@@ -240,12 +240,19 @@ export function PremiumScreen() {
             {paymentStatus === 'creating' ? (
               <p className="py-8 text-center text-sm text-gray-400">Đang tạo đơn thanh toán…</p>
             ) : paymentStatus === 'paid' ? (
-              <div className="py-8 text-center">
+              <div className="py-6 text-center" role="status" aria-live="polite">
                 <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[#94d400]/15">
                   <Check size={28} className="text-[#94d400]" />
                 </div>
                 <p className="text-2xl font-bold text-[#94d400]">Thanh toán thành công</p>
                 <p className="mt-2 text-sm text-gray-400">Bạn đã mua gói {selectedPlanDetails.name}. Premium đã được kích hoạt.</p>
+                <button
+                  onClick={() => setShowPayment(false)}
+                  className="mt-6 w-full rounded-2xl py-3.5 font-semibold text-[#0d1f12]"
+                  style={{ background: 'linear-gradient(135deg, #94d400 0%, #72a800 100%)' }}
+                >
+                  Hoàn tất
+                </button>
               </div>
             ) : expired ? (
               <div className="py-5 text-center">
