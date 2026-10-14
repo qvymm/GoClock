@@ -37,30 +37,6 @@ import {
   Cell,
 } from 'recharts';
 
-const userGrowthData = [
-  { month: 'Jan', users: 8200 },
-  { month: 'Feb', users: 9100 },
-  { month: 'Mar', users: 9800 },
-  { month: 'Apr', users: 10400 },
-  { month: 'May', users: 11200 },
-  { month: 'Jun', users: 12450 },
-];
-
-const revenueTrend = [
-  { month: 'Jan', revenue: 24000000 },
-  { month: 'Feb', revenue: 31000000 },
-  { month: 'Mar', revenue: 36000000 },
-  { month: 'Apr', revenue: 42000000 },
-  { month: 'May', revenue: 47000000 },
-  { month: 'Jun', revenue: 52000000 },
-];
-
-const featureUsageData = [
-  { name: 'Task Management', value: 45 },
-  { name: 'Meal Tracking', value: 35 },
-  { name: 'Sleep Planner', value: 20 },
-];
-
 const featureColors = ['#2563eb', '#16a34a', '#f5890b'];
 
 type UserRow = {
@@ -117,7 +93,14 @@ const taskCompletionData = [
 
 export function AdminDashboardScreen() {
   const { logout } = useApp();
-  const { stats: dashboardStats, isUsingMockData } = useAdminStats();
+  const {
+    stats: dashboardStats,
+    userGrowth,
+    revenueTrend,
+    featureUsage: featureUsageDataState,
+    isUsingMockData,
+    statsError,
+  } = useAdminStats();
   const [activeSection, setActiveSection] = useState('dashboard');
   const [search, setSearch] = useState('');
   const [analyticsTab, setAnalyticsTab] = useState<'task' | 'meal' | 'sleep' | 'retention'>('task');
@@ -162,13 +145,6 @@ export function AdminDashboardScreen() {
     );
   }, [search, userRows]);
 
-  const totalFeatures = dashboardStats.totalTasks + dashboardStats.totalMeals + dashboardStats.totalSleepLogs;
-  const featureUsageDataState = totalFeatures > 0 ? [
-    { name: 'Task Management', value: Math.round((dashboardStats.totalTasks / totalFeatures) * 100) },
-    { name: 'Meal Tracking', value: Math.round((dashboardStats.totalMeals / totalFeatures) * 100) },
-    { name: 'Sleep Planner', value: Math.round((dashboardStats.totalSleepLogs / totalFeatures) * 100) },
-  ] : featureUsageData;
-
   const taskCompletionRate = dashboardStats.totalTasks > 0 ? Math.round((dashboardStats.completedTasks / dashboardStats.totalTasks) * 100) : 0;
   const avgTasksUser = dashboardStats.totalUsers > 0 ? (dashboardStats.totalTasks / dashboardStats.totalUsers).toFixed(1) : '0';
 
@@ -212,7 +188,8 @@ export function AdminDashboardScreen() {
             <section className="space-y-6">
               {isUsingMockData && (
                 <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-medium text-amber-800">
-                  Đang hiển thị số liệu demo. Kết nối Supabase và dữ liệu thực sẽ được ưu tiên khi có sẵn.
+                  Đang hiển thị số liệu demo. {statsError ?? 'Chưa tải được thống kê Supabase.'}
+                  {' '}Hãy chạy migration `20261014160000_add_admin_dashboard_stats_rpc.sql` trong đúng project Supabase.
                 </p>
               )}
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -231,7 +208,7 @@ export function AdminDashboardScreen() {
                   <ChartCard title="User Growth" description="Jan - Jun" icon={TrendingUp}>
                     <div className="mt-5 h-64">
                       <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={userGrowthData} margin={{ top: 10, right: 0, left: -10, bottom: 0 }}>
+                        <LineChart data={userGrowth} margin={{ top: 10, right: 0, left: -10, bottom: 0 }}>
                           <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
                           <XAxis dataKey="month" tickLine={false} axisLine={false} />
                           <YAxis domain={[0, 14000]} ticks={[0, 2000, 4000, 6000, 8000, 10000, 12000, 14000]}

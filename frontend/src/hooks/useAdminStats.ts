@@ -12,6 +12,9 @@ export type AdminStats = {
   completedTasks: number;
 };
 
+export type UserGrowthPoint = { month: string; users: number };
+export type RevenuePoint = { month: string; revenue: number };
+
 export const MOCK_ADMIN_STATS: AdminStats = {
   totalUsers: 12_450,
   activeUsersToday: 3_245,
@@ -23,119 +26,119 @@ export const MOCK_ADMIN_STATS: AdminStats = {
   completedTasks: 21_668,
 };
 
-function asCount(value: number | null) {
-  return value ?? 0;
+export const MOCK_USER_GROWTH: UserGrowthPoint[] = [
+  { month: 'Jan', users: 8200 },
+  { month: 'Feb', users: 9100 },
+  { month: 'Mar', users: 9800 },
+  { month: 'Apr', users: 10400 },
+  { month: 'May', users: 11200 },
+  { month: 'Jun', users: 12450 },
+];
+
+export const MOCK_REVENUE_TREND: RevenuePoint[] = [
+  { month: 'Jan', revenue: 24000000 },
+  { month: 'Feb', revenue: 31000000 },
+  { month: 'Mar', revenue: 36000000 },
+  { month: 'Apr', revenue: 42000000 },
+  { month: 'May', revenue: 47000000 },
+  { month: 'Jun', revenue: 52000000 },
+];
+
+const MOCK_FEATURE_USAGE = [
+  { name: 'Task Management', value: 45 },
+  { name: 'Meal Tracking', value: 35 },
+  { name: 'Sleep Planner', value: 20 },
+];
+
+type DashboardPayload = AdminStats & {
+  userGrowth: UserGrowthPoint[];
+  revenueTrend: RevenuePoint[];
+};
+
+function validTrend<T extends UserGrowthPoint | RevenuePoint>(value: unknown, key: 'users' | 'revenue'): T[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap(point => {
+    if (
+      typeof point === 'object' &&
+      point !== null &&
+      'month' in point &&
+      typeof point.month === 'string' &&
+      key in point &&
+      typeof point[key] === 'number'
+    ) {
+      return [{ month: point.month, [key]: point[key] } as T];
+    }
+    return [];
+  });
+}
+
+function hasUsage(stats: AdminStats) {
+  return stats.totalUsers + stats.totalTasks + stats.totalMeals + stats.totalSleepLogs > 0;
 }
 
 export function useAdminStats() {
   const [stats, setStats] = useState<AdminStats>(MOCK_ADMIN_STATS);
+  const [userGrowth, setUserGrowth] = useState(MOCK_USER_GROWTH);
+  const [revenueTrend, setRevenueTrend] = useState(MOCK_REVENUE_TREND);
   const [isUsingMockData, setIsUsingMockData] = useState(true);
+  const [statsError, setStatsError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
 
     async function loadStats() {
-      if (!isSupabaseEnabled) return;
+      if (!isSupabaseEnabled) {
+        setStatsError('Chưa cấu hình kết nối Supabase.');
+        return;
+      }
 
       try {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const todayIso = today.toISOString();
-        const todayDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        const { data, error } = await supabase.rpc('get_admin_dashboard_stats');
+        if (error) throw error;
+        if (!data || typeof data !== 'object') {
+          throw new Error('RPC did not return dashboard statistics.');
+        }
 
-        const [
-          usersResult,
-          premiumUsersResult,
-          activePremiumProfilesResult,
-          tasksResult,
-          mealsResult,
-          sleepResult,
-          completedTasksResult,
-          tasksTodayResult,
-          mealsTodayResult,
-          sleepTodayResult,
-          premiumOrdersResult,
-        ] = await Promise.all([
-          supabase.from('profiles').select('id', { count: 'exact', head: true }),
-          supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('is_premium', true),
-          supabase.from('profiles').select('id').eq('is_premium', true).gt('premium_until', new Date().toISOString()),
-          supabase.from('tasks').select('id', { count: 'exact', head: true }),
-          supabase.from('meals').select('id', { count: 'exact', head: true }),
-          supabase.from('sleep_logs').select('id', { count: 'exact', head: true }),
-          supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('status', 'completed'),
-          supabase.from('tasks').select('user_id').gte('updated_at', todayIso),
-          supabase.from('meals').select('user_id').gte('eaten_at', todayIso),
-          supabase.from('sleep_logs').select('user_id').gte('log_date', todayDate),
-          supabase.from('premium_orders')
-            .select('user_id, plan, amount, paid_at')
-            .eq('status', 'paid')
-            .order('paid_at', { ascending: false }),
-        ]);
+        const payload = data as DashboardPayload;
+        const realStats: AdminStats = {
+          totalUsers: Number(payload.totalUsers) || 0,
+          activeUsersToday: Number(payload.activeUsersToday) || 0,
+          premiumUsers: Number(payload.premiumUsers) || 0,
+          monthlyRevenue: Number(payload.monthlyRevenue) || 0,
+          totalTasks: Number(payload.totalTasks) || 0,
+          totalMeals: Number(payload.totalMeals) || 0,
+          totalSleepLogs: Number(payload.totalSleepLogs) || 0,
+          completedTasks: Number(payload.completedTasks) || 0,
+        };
 
-        const results = [
-          usersResult,
-          premiumUsersResult,
-          activePremiumProfilesResult,
-          tasksResult,
-          mealsResult,
-          sleepResult,
-          completedTasksResult,
-          tasksTodayResult,
-          mealsTodayResult,
-          sleepTodayResult,
-          premiumOrdersResult,
-        ];
-        const failed = results.find(result => result.error);
-        if (failed?.error) throw failed.error;
-
-        const totalUsers = asCount(usersResult.count);
-        const totalTasks = asCount(tasksResult.count);
-        const totalMeals = asCount(mealsResult.count);
-        const totalSleepLogs = asCount(sleepResult.count);
-        const hasRealData = totalUsers + totalTasks + totalMeals + totalSleepLogs > 0;
-
-        if (!hasRealData) {
+        if (!hasUsage(realStats)) {
           if (active) {
             setStats(MOCK_ADMIN_STATS);
+            setUserGrowth(MOCK_USER_GROWTH);
+            setRevenueTrend(MOCK_REVENUE_TREND);
             setIsUsingMockData(true);
+            setStatsError('Supabase trả về 0 bản ghi cho người dùng, công việc, bữa ăn và giấc ngủ; đang hiển thị số liệu demo.');
           }
           return;
         }
 
-        const activeUserIds = new Set([
-          ...(tasksTodayResult.data ?? []).map(row => row.user_id),
-          ...(mealsTodayResult.data ?? []).map(row => row.user_id),
-          ...(sleepTodayResult.data ?? []).map(row => row.user_id),
-        ]);
-        const activePremiumIds = new Set((activePremiumProfilesResult.data ?? []).map(profile => profile.id));
-        const latestOrders = new Map<string, { plan: string; amount: number }>();
-        for (const order of premiumOrdersResult.data ?? []) {
-          if (activePremiumIds.has(order.user_id) && !latestOrders.has(order.user_id)) {
-            latestOrders.set(order.user_id, { plan: order.plan, amount: Number(order.amount ?? 0) });
-          }
-        }
-        const monthlyRevenue = [...latestOrders.values()].reduce((sum, order) =>
-          sum + (order.plan === 'yearly' ? order.amount / 12 : order.amount), 0
-        );
-
+        const realUserGrowth = validTrend<UserGrowthPoint>(payload.userGrowth, 'users');
+        const realRevenueTrend = validTrend<RevenuePoint>(payload.revenueTrend, 'revenue');
         if (active) {
-          setStats({
-            totalUsers,
-            activeUsersToday: activeUserIds.size,
-            premiumUsers: asCount(premiumUsersResult.count),
-            monthlyRevenue,
-            totalTasks,
-            totalMeals,
-            totalSleepLogs,
-            completedTasks: asCount(completedTasksResult.count),
-          });
+          setStats(realStats);
+          setUserGrowth(realUserGrowth.length ? realUserGrowth : MOCK_USER_GROWTH);
+          setRevenueTrend(realRevenueTrend.length ? realRevenueTrend : MOCK_REVENUE_TREND);
           setIsUsingMockData(false);
+          setStatsError(null);
         }
       } catch (error) {
         console.error('Unable to load admin dashboard statistics:', error);
         if (active) {
           setStats(MOCK_ADMIN_STATS);
+          setUserGrowth(MOCK_USER_GROWTH);
+          setRevenueTrend(MOCK_REVENUE_TREND);
           setIsUsingMockData(true);
+          setStatsError(error instanceof Error ? error.message : 'Không thể tải thống kê Supabase.');
         }
       }
     }
@@ -146,5 +149,14 @@ export function useAdminStats() {
     };
   }, []);
 
-  return { stats, isUsingMockData };
+  const totalFeatures = stats.totalTasks + stats.totalMeals + stats.totalSleepLogs;
+  const featureUsage = totalFeatures > 0
+    ? [
+        { name: 'Task Management', value: Math.round(stats.totalTasks * 100 / totalFeatures) },
+        { name: 'Meal Tracking', value: Math.round(stats.totalMeals * 100 / totalFeatures) },
+        { name: 'Sleep Planner', value: Math.round(stats.totalSleepLogs * 100 / totalFeatures) },
+      ]
+    : MOCK_FEATURE_USAGE;
+
+  return { stats, userGrowth, revenueTrend, featureUsage, isUsingMockData, statsError };
 }
