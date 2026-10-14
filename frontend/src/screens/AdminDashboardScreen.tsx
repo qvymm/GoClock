@@ -1,23 +1,24 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   ArrowRight,
   Bell,
   CalendarDays,
   CircleDot,
   CreditCard,
+  Lock,
   MessageSquare,
   PieChart,
   Search,
   Send,
   Star,
+  Unlock,
   User,
   UserCheck,
   Wallet,
   TrendingUp,
   ShieldCheck,
   Database,
-  Lock,
-  Trash2,
+  X,
 } from 'lucide-react';
 import { useApp } from '../lib/AppContext';
 import { supabase } from '../lib/supabase';
@@ -45,13 +46,27 @@ type UserRow = {
   email: string;
   plan: string;
   status: string;
+  created_at: string;
+  last_sign_in_at: string | null;
+  premium_until: string | null;
+  is_admin: boolean;
 };
 
-const subscriptionRows = [
-  { user: 'Linh', package: 'Premium Yearly', start: '2025-11-01', expiry: '2026-11-01', status: 'Active' },
-  { user: 'Minh', package: 'Premium Monthly', start: '2026-05-15', expiry: '2026-06-15', status: 'Active' },
-  { user: 'An', package: 'Premium Monthly', start: '2026-02-01', expiry: '2026-03-01', status: 'Expired' },
-];
+type SubscriptionRow = {
+  id: string;
+  user_id: string;
+  name: string;
+  email: string;
+  plan: string;
+  amount: number;
+  payment_status: string;
+  status: string;
+  created_at: string;
+  paid_at: string | null;
+  expiry: string | null;
+};
+
+const ADMIN_PAGE_SIZE = 25;
 
 const analyticsCards = {
   task: {
@@ -109,41 +124,124 @@ export function AdminDashboardScreen() {
   const [settings, setSettings] = useState({ push: true, email: false, inApp: true });
 
   const [userRows, setUserRows] = useState<UserRow[]>([]);
-  const [loadingUsers, setLoadingUsers] = useState(true);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [userError, setUserError] = useState('');
+  const [userTotal, setUserTotal] = useState(0);
+  const [userPage, setUserPage] = useState(1);
+  const [userRefreshNonce, setUserRefreshNonce] = useState(0);
+  const [selectedUser, setSelectedUser] = useState<UserRow | null>(null);
+  const [userActionError, setUserActionError] = useState('');
+  const [loadingUserAction, setLoadingUserAction] = useState(false);
+  const [subscriptionRows, setSubscriptionRows] = useState<SubscriptionRow[]>([]);
+  const [loadingSubscriptions, setLoadingSubscriptions] = useState(false);
+  const [subscriptionError, setSubscriptionError] = useState('');
+  const [subscriptionTotal, setSubscriptionTotal] = useState(0);
+  const [subscriptionPage, setSubscriptionPage] = useState(1);
+  const [subscriptionSearch, setSubscriptionSearch] = useState('');
+  const [selectedSubscription, setSelectedSubscription] = useState<SubscriptionRow | null>(null);
 
   useEffect(() => {
-    async function fetchUsers() {
-      setLoadingUsers(true);
-      try {
-        const { data, error } = await supabase.from('profiles').select('id, full_name, nickname, username');
-        if (error) throw error;
-        if (data) {
-          const mapped: UserRow[] = data.map((profile: any) => ({
-            id: profile.id,
-            name: profile.full_name || profile.nickname || profile.username || 'Unknown',
-            email: '—',
-            plan: 'Free', // Placeholder
-            status: 'Active', // Placeholder
-          }));
-          setUserRows(mapped);
+    if (activeSection !== 'users') return;
+    let current = true;
+    const timeout = window.setTimeout(() => {
+      async function fetchUsers() {
+        setLoadingUsers(true);
+        setUserError('');
+        const { data, error } = await supabase.rpc('get_admin_users', {
+          p_search: search.trim(),
+          p_page: userPage,
+          p_page_size: ADMIN_PAGE_SIZE,
+        });
+        if (!current) return;
+        if (error) {
+          console.error('Unable to load admin users:', error);
+          setUserError('Không thể tải người dùng. Hãy chạy migration quản lý người dùng mới nhất và thử lại.');
+          setUserRows([]);
+          setUserTotal(0);
+        } else if (data && typeof data === 'object') {
+          const result = data as { total?: number; users?: UserRow[] };
+          setUserRows(Array.isArray(result.users) ? result.users : []);
+          setUserTotal(Number(result.total) || 0);
         }
-      } catch (error) {
-        console.error('Error fetching users:', error);
-      } finally {
         setLoadingUsers(false);
       }
-    }
-    fetchUsers();
-  }, []);
+      void fetchUsers();
+    }, 250);
 
-  const filteredUsers = useMemo(() => {
-    const term = search.toLowerCase();
-    return userRows.filter((user) =>
-      user.id.includes(term) ||
-      user.name.toLowerCase().includes(term) ||
-      user.email.toLowerCase().includes(term)
-    );
-  }, [search, userRows]);
+    return () => {
+      current = false;
+      window.clearTimeout(timeout);
+    };
+  }, [activeSection, search, userPage, userRefreshNonce]);
+
+  useEffect(() => {
+    if (activeSection !== 'subscriptions') return;
+    let current = true;
+    const timeout = window.setTimeout(() => {
+      async function fetchSubscriptions() {
+        setLoadingSubscriptions(true);
+        setSubscriptionError('');
+        const { data, error } = await supabase.rpc('get_admin_subscriptions', {
+          p_search: subscriptionSearch.trim(),
+          p_page: subscriptionPage,
+          p_page_size: ADMIN_PAGE_SIZE,
+        });
+        if (!current) return;
+        if (error) {
+          console.error('Unable to load admin subscriptions:', error);
+          setSubscriptionError('Không thể tải giao dịch Premium. Hãy kiểm tra migration quản lý người dùng và bảng premium_orders.');
+          setSubscriptionRows([]);
+          setSubscriptionTotal(0);
+        } else if (data && typeof data === 'object') {
+          const result = data as { total?: number; subscriptions?: SubscriptionRow[] };
+          setSubscriptionRows(Array.isArray(result.subscriptions) ? result.subscriptions : []);
+          setSubscriptionTotal(Number(result.total) || 0);
+        }
+        setLoadingSubscriptions(false);
+      }
+      void fetchSubscriptions();
+    }, 250);
+
+    return () => {
+      current = false;
+      window.clearTimeout(timeout);
+    };
+  }, [activeSection, subscriptionPage, subscriptionSearch]);
+
+  async function toggleUserSuspension(user: UserRow) {
+    const suspended = user.status === 'Suspended';
+    const action = suspended ? 'bỏ tạm ngưng' : 'tạm ngưng';
+    if (!window.confirm(`Bạn có chắc muốn ${action} tài khoản ${user.email || user.name}?`)) return;
+
+    setLoadingUserAction(true);
+    setUserActionError('');
+    const { error } = await supabase.rpc('admin_set_user_suspension', {
+      p_user_id: user.id,
+      p_suspended: !suspended,
+    });
+    setLoadingUserAction(false);
+    if (error) {
+      console.error('Unable to change user suspension:', error);
+      setUserActionError('Không thể cập nhật trạng thái tài khoản. Hãy chạy migration quản lý người dùng mới nhất.');
+      return;
+    }
+    setSelectedUser(null);
+    setUserRefreshNonce(value => value + 1);
+  }
+
+  useEffect(() => {
+    setUserPage(1);
+  }, [search]);
+
+  useEffect(() => {
+    setSubscriptionPage(1);
+  }, [subscriptionSearch]);
+
+  function formatDate(value: string | null | undefined) {
+    if (!value) return '—';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString('vi-VN');
+  }
 
   const taskCompletionRate = dashboardStats.totalTasks > 0 ? Math.round((dashboardStats.completedTasks / dashboardStats.totalTasks) * 100) : 0;
   const avgTasksUser = dashboardStats.totalUsers > 0 ? (dashboardStats.totalTasks / dashboardStats.totalUsers).toFixed(1) : '0';
@@ -286,6 +384,12 @@ export function AdminDashboardScreen() {
                     />
                   </div>
                 </div>
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+                  <span>{userTotal.toLocaleString('vi-VN')} tài khoản trong Supabase Auth</span>
+                  <span>Trang {userPage} · tối đa {ADMIN_PAGE_SIZE} tài khoản/trang</span>
+                </div>
+                {userError && <p role="alert" className="mt-3 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{userError}</p>}
+                {userActionError && <p role="alert" className="mt-3 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{userActionError}</p>}
               </div>
 
               <div className="overflow-x-auto rounded-3xl bg-white shadow-sm ring-1 ring-slate-200">
@@ -307,38 +411,47 @@ export function AdminDashboardScreen() {
                           Loading users...
                         </td>
                       </tr>
-                    ) : filteredUsers.length === 0 ? (
+                    ) : userRows.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="px-6 py-8 text-center text-sm text-slate-500">
-                          No users found
+                          {search ? 'Không tìm thấy tài khoản phù hợp.' : 'Chưa có tài khoản trong Supabase Auth.'}
                         </td>
                       </tr>
                     ) : (
-                      filteredUsers.map((user) => (
+                      userRows.map((user) => (
                         <tr key={user.id} className="hover:bg-slate-50 transition-colors">
                           <td className="px-6 py-4 text-sm font-medium text-slate-900 truncate max-w-[120px]" title={user.id}>{user.id}</td>
                           <td className="px-6 py-4 text-sm text-slate-700">{user.name}</td>
-                          <td className="px-6 py-4 text-sm text-slate-700">{user.email}</td>
+                          <td className="px-6 py-4 text-sm text-slate-700">{user.email || '—'}</td>
                           <td className="px-6 py-4 text-sm text-slate-700">{user.plan}</td>
                           <td className="px-6 py-4">
-                            <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${user.status === 'Active' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                            <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                              user.status === 'Active' ? 'bg-emerald-100 text-emerald-700'
+                                : user.status === 'Suspended' ? 'bg-rose-100 text-rose-700'
+                                  : 'bg-amber-100 text-amber-800'
+                            }`}>
                               {user.status}
                             </span>
                           </td>
                           <td className="px-6 py-4">
                             <div className="flex flex-wrap gap-2">
-                              <button className="inline-flex items-center justify-center rounded-2xl bg-slate-100 p-2 text-slate-600 transition hover:bg-slate-200" aria-label="View user">
+                              <button onClick={() => { setSelectedUser(user); setUserActionError(''); }}
+                                className="inline-flex items-center justify-center rounded-2xl bg-slate-100 p-2 text-slate-600 transition hover:bg-slate-200" aria-label="View user">
                                 <ArrowRight size={14} />
                               </button>
-                              <button className="inline-flex items-center justify-center rounded-2xl bg-slate-100 p-2 text-slate-600 transition hover:bg-slate-200" aria-label="Suspend user">
-                                <Lock size={14} />
+                              <button onClick={() => void toggleUserSuspension(user)}
+                                disabled={loadingUserAction || user.is_admin}
+                                title={user.is_admin ? 'Không thể tạm ngưng tài khoản admin' : user.status === 'Suspended' ? 'Bỏ tạm ngưng' : 'Tạm ngưng'}
+                                className="inline-flex items-center justify-center rounded-2xl bg-slate-100 p-2 text-slate-600 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40"
+                                aria-label={user.status === 'Suspended' ? 'Unsuspend user' : 'Suspend user'}>
+                                {user.status === 'Suspended' ? <Unlock size={14} /> : <Lock size={14} />}
                               </button>
-                              <button className="inline-flex items-center justify-center rounded-2xl bg-slate-100 p-2 text-slate-600 transition hover:bg-slate-200" aria-label="Delete user">
-                                <Trash2 size={14} />
-                              </button>
-                              <button className="inline-flex items-center justify-center rounded-2xl bg-slate-100 p-2 text-slate-600 transition hover:bg-slate-200" aria-label="Message user">
+                              <a href={user.email ? `mailto:${user.email}` : undefined}
+                                aria-disabled={!user.email}
+                                className="inline-flex items-center justify-center rounded-2xl bg-slate-100 p-2 text-slate-600 transition hover:bg-slate-200 aria-disabled:pointer-events-none aria-disabled:opacity-40"
+                                aria-label="Message user">
                                 <MessageSquare size={14} />
-                              </button>
+                              </a>
                             </div>
                           </td>
                         </tr>
@@ -346,6 +459,14 @@ export function AdminDashboardScreen() {
                     )}
                   </tbody>
                 </table>
+              </div>
+              <div className="flex items-center justify-between rounded-2xl bg-white px-4 py-3 shadow-sm ring-1 ring-slate-200">
+                <button disabled={userPage <= 1 || loadingUsers} onClick={() => setUserPage(page => Math.max(1, page - 1))}
+                  className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-40">Trước</button>
+                <span className="text-xs text-slate-500">Trang {userPage} / {Math.max(1, Math.ceil(userTotal / ADMIN_PAGE_SIZE))}</span>
+                <button disabled={loadingUsers || userPage * ADMIN_PAGE_SIZE >= userTotal}
+                  onClick={() => setUserPage(page => page + 1)}
+                  className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-40">Tiếp</button>
               </div>
             </section>
           )}
@@ -355,33 +476,37 @@ export function AdminDashboardScreen() {
               <div className="grid gap-4 xl:grid-cols-3">
                 <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
                   <p className="text-sm font-semibold text-slate-900">Premium Users</p>
-                  <p className="mt-4 text-3xl font-semibold text-slate-900">0</p>
+                  <p className="mt-4 text-3xl font-semibold text-slate-900">{dashboardStats.premiumUsers.toLocaleString('vi-VN')}</p>
                 </div>
                 <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
                   <p className="text-sm font-semibold text-slate-900">Conversion Rate</p>
                   <div className="mt-4 flex items-center gap-3">
                     <TrendingUp size={18} className="text-emerald-600" />
-                    <p className="text-3xl font-semibold text-slate-900">0.0%</p>
+                    <p className="text-3xl font-semibold text-slate-900">
+                      {dashboardStats.totalUsers > 0 ? (dashboardStats.premiumUsers * 100 / dashboardStats.totalUsers).toFixed(1) : '0.0'}%
+                    </p>
                   </div>
                 </div>
                 <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
                   <p className="text-sm font-semibold text-slate-900">Monthly Recurring Revenue</p>
-                  <p className="mt-4 text-3xl font-semibold text-slate-900">0 VNĐ</p>
+                  <p className="mt-4 text-3xl font-semibold text-slate-900">{dashboardStats.monthlyRevenue.toLocaleString('vi-VN')} VNĐ</p>
                 </div>
               </div>
 
               <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <h3 className="text-xl font-semibold text-slate-900">Subscription Actions</h3>
-                    <p className="mt-2 text-sm text-slate-500">Quick actions for subscription growth.</p>
+                    <h3 className="text-xl font-semibold text-slate-900">Lịch sử đơn Premium</h3>
+                    <p className="mt-2 text-sm text-slate-500">{subscriptionTotal.toLocaleString('vi-VN')} giao dịch từ Supabase</p>
                   </div>
-                  <div className="flex flex-wrap gap-3">
-                    <button className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700">Tạo Coupon</button>
-                    <button className="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700">Gia hạn Premium</button>
-                    <button className="rounded-2xl bg-violet-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-violet-700">Khuyến mãi</button>
+                  <div className="flex min-w-0 items-center gap-3 rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 sm:w-[360px]">
+                    <Search size={16} className="shrink-0 text-slate-500" />
+                    <input value={subscriptionSearch} onChange={event => setSubscriptionSearch(event.target.value)}
+                      placeholder="Tìm theo tên, email hoặc mã đơn"
+                      className="w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400" />
                   </div>
                 </div>
+                {subscriptionError && <p role="alert" className="mt-4 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{subscriptionError}</p>}
               </div>
 
               <div className="overflow-x-auto rounded-3xl bg-white shadow-sm ring-1 ring-slate-200">
@@ -389,34 +514,58 @@ export function AdminDashboardScreen() {
                   <thead className="bg-slate-50">
                     <tr>
                       <th className="px-6 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">User</th>
-                      <th className="px-6 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Package</th>
-                      <th className="px-6 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Start Date</th>
+                      <th className="px-6 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Package / Amount</th>
+                      <th className="px-6 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Paid / Created</th>
                       <th className="px-6 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Expiry</th>
                       <th className="px-6 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Status</th>
-                      <th className="px-6 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Actions</th>
+                      <th className="px-6 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Details</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 bg-white">
-                    {subscriptionRows.map((row) => (
-                      <tr key={row.user} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-6 py-4 text-sm font-medium text-slate-900">{row.user}</td>
-                        <td className="px-6 py-4 text-sm text-slate-700">{row.package}</td>
-                        <td className="px-6 py-4 text-sm text-slate-700">{row.start}</td>
-                        <td className="px-6 py-4 text-sm text-slate-700">{row.expiry}</td>
+                    {loadingSubscriptions ? (
+                      <tr><td colSpan={6} className="px-6 py-8 text-center text-sm text-slate-500">Đang tải giao dịch…</td></tr>
+                    ) : subscriptionRows.length === 0 ? (
+                      <tr><td colSpan={6} className="px-6 py-8 text-center text-sm text-slate-500">
+                        {subscriptionSearch ? 'Không tìm thấy giao dịch phù hợp.' : 'Chưa có đơn Premium trong Supabase.'}
+                      </td></tr>
+                    ) : subscriptionRows.map(row => (
+                      <tr key={row.id} className="hover:bg-slate-50 transition-colors">
                         <td className="px-6 py-4">
-                          <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${row.status === 'Active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'}`}>
-                            {row.status}
-                          </span>
+                          <p className="text-sm font-medium text-slate-900">{row.name}</p>
+                          <p className="mt-1 text-xs text-slate-500">{row.email || '—'}</p>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-slate-700">
+                          <p>Premium {row.plan === 'yearly' ? 'Yearly' : 'Monthly'}</p>
+                          <p className="mt-1 text-xs text-slate-500">{Number(row.amount).toLocaleString('vi-VN')} VNĐ</p>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-slate-700">{formatDate(row.paid_at ?? row.created_at)}</td>
+                        <td className="px-6 py-4 text-sm text-slate-700">{formatDate(row.expiry)}</td>
+                        <td className="px-6 py-4">
+                          <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                            row.status === 'Active' ? 'bg-emerald-100 text-emerald-700'
+                              : row.status === 'Pending' ? 'bg-amber-100 text-amber-800'
+                                : 'bg-slate-100 text-slate-700'
+                          }`}>{row.status}</span>
                         </td>
                         <td className="px-6 py-4">
-                          <button className="inline-flex items-center justify-center rounded-2xl bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-200">
-                            View
+                          <button onClick={() => setSelectedSubscription(row)}
+                            className="inline-flex items-center justify-center rounded-2xl bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-200">
+                            Chi tiết
                           </button>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+              </div>
+              <div className="flex items-center justify-between rounded-2xl bg-white px-4 py-3 shadow-sm ring-1 ring-slate-200">
+                <button disabled={subscriptionPage <= 1 || loadingSubscriptions}
+                  onClick={() => setSubscriptionPage(page => Math.max(1, page - 1))}
+                  className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-40">Trước</button>
+                <span className="text-xs text-slate-500">Trang {subscriptionPage} / {Math.max(1, Math.ceil(subscriptionTotal / ADMIN_PAGE_SIZE))}</span>
+                <button disabled={loadingSubscriptions || subscriptionPage * ADMIN_PAGE_SIZE >= subscriptionTotal}
+                  onClick={() => setSubscriptionPage(page => page + 1)}
+                  className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-40">Tiếp</button>
               </div>
             </section>
           )}
@@ -612,6 +761,90 @@ export function AdminDashboardScreen() {
                 </div>
               </div>
             </section>
+          )}
+
+          {selectedUser && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4"
+              onMouseDown={event => { if (event.target === event.currentTarget) setSelectedUser(null); }}>
+              <section role="dialog" aria-modal="true" aria-labelledby="admin-user-title"
+                className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">User details</p>
+                    <h2 id="admin-user-title" className="mt-2 text-xl font-bold text-slate-900">{selectedUser.name}</h2>
+                    <p className="mt-1 text-sm text-slate-500">{selectedUser.email || 'Email unavailable'}</p>
+                  </div>
+                  <button onClick={() => setSelectedUser(null)} aria-label="Close user details"
+                    className="rounded-xl p-2 text-slate-500 hover:bg-slate-100"><X size={18} /></button>
+                </div>
+
+                <dl className="mt-6 grid gap-3 sm:grid-cols-2">
+                  {[
+                    { label: 'User ID', value: selectedUser.id },
+                    { label: 'Plan', value: selectedUser.plan },
+                    { label: 'Account status', value: selectedUser.is_admin ? 'Admin' : selectedUser.status },
+                    { label: 'Registered', value: formatDate(selectedUser.created_at) },
+                    { label: 'Last sign-in', value: formatDate(selectedUser.last_sign_in_at) },
+                    { label: 'Premium expiry', value: formatDate(selectedUser.premium_until) },
+                  ].map(item => (
+                    <div key={item.label} className="min-w-0 rounded-2xl bg-slate-50 p-3">
+                      <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{item.label}</dt>
+                      <dd className="mt-1 break-all text-sm font-semibold text-slate-800">{item.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+                {userActionError && <p role="alert" className="mt-4 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{userActionError}</p>}
+                <div className="mt-6 flex flex-wrap justify-end gap-3">
+                  {selectedUser.email && (
+                    <a href={`mailto:${selectedUser.email}`}
+                      className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                      Gửi email
+                    </a>
+                  )}
+                  {!selectedUser.is_admin && (
+                    <button type="button" disabled={loadingUserAction}
+                      onClick={() => void toggleUserSuspension(selectedUser)}
+                      className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50">
+                      {loadingUserAction ? 'Đang cập nhật…' : selectedUser.status === 'Suspended' ? 'Bỏ tạm ngưng' : 'Tạm ngưng tài khoản'}
+                    </button>
+                  )}
+                </div>
+              </section>
+            </div>
+          )}
+
+          {selectedSubscription && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4"
+              onMouseDown={event => { if (event.target === event.currentTarget) setSelectedSubscription(null); }}>
+              <section role="dialog" aria-modal="true" aria-labelledby="admin-subscription-title"
+                className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Premium order</p>
+                    <h2 id="admin-subscription-title" className="mt-2 text-xl font-bold text-slate-900">{selectedSubscription.name}</h2>
+                    <p className="mt-1 text-sm text-slate-500">{selectedSubscription.email || 'Email unavailable'}</p>
+                  </div>
+                  <button onClick={() => setSelectedSubscription(null)} aria-label="Close order details"
+                    className="rounded-xl p-2 text-slate-500 hover:bg-slate-100"><X size={18} /></button>
+                </div>
+                <dl className="mt-6 space-y-3">
+                  {[
+                    { label: 'Order ID', value: selectedSubscription.id },
+                    { label: 'Plan', value: selectedSubscription.plan === 'yearly' ? 'Premium Yearly' : 'Premium Monthly' },
+                    { label: 'Amount', value: `${Number(selectedSubscription.amount).toLocaleString('vi-VN')} VNĐ` },
+                    { label: 'Payment status', value: selectedSubscription.payment_status },
+                    { label: 'Created', value: formatDate(selectedSubscription.created_at) },
+                    { label: 'Paid', value: formatDate(selectedSubscription.paid_at) },
+                    { label: 'Premium expiry', value: formatDate(selectedSubscription.expiry) },
+                  ].map(item => (
+                    <div key={item.label} className="flex items-start justify-between gap-4 border-b border-slate-100 pb-2">
+                      <dt className="text-sm text-slate-500">{item.label}</dt>
+                      <dd className="max-w-[65%] break-all text-right text-sm font-semibold text-slate-800">{item.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </section>
+            </div>
           )}
     </AdminLayout>
   );
