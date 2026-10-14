@@ -77,10 +77,11 @@ export function PremiumScreen() {
         body: { plan: selectedPlan },
       });
       if (error) throw new Error(await getFunctionErrorMessage(error));
-      if (!result?.code || !result?.expiresAt) throw new Error('Edge Function không trả đủ thông tin đơn thanh toán.');
+      const orderExpiresAt = result?.expiresAt ?? result?.expires_at;
+      if (!result?.code || !orderExpiresAt) throw new Error('Edge Function không trả đủ thông tin đơn thanh toán.');
       setTransferCode(result.code);
       setPaymentAmount(Number(result.amount));
-      setExpiresAt(new Date(result.expiresAt).getTime());
+      setExpiresAt(new Date(orderExpiresAt).getTime());
       setSecondsLeft(180);
       setPaymentStatus('pending');
     } catch (error) {
@@ -108,9 +109,10 @@ export function PremiumScreen() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session?.access_token) return;
-        const { data: result, error } = await supabase.functions.invoke('order-status', {
-          body: { code: transferCode },
-        });
+        const { data: result, error } = await supabase.functions.invoke(
+          `order-status?code=${encodeURIComponent(transferCode)}`,
+          { method: 'GET' },
+        );
         if (error || !active || !result) return;
         if (result.status === 'paid') {
           setTransferCode('');
