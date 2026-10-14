@@ -140,7 +140,7 @@ function deadlineRemaining(deadline: string, now: number) {
   return hours > 0 ? `Còn ${hours} giờ ${minutes} phút` : `Còn ${Math.max(1, minutes)} phút`;
 }
 
-export default function CalendarScreen() {
+export function CalendarScreen() {
   const { user, tasks, refreshTasks } = useApp();
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [visibleMonth, setVisibleMonth] = useState(() => new Date());
