@@ -78,6 +78,11 @@ export type Task = {
   description?: string;
   category: 'study' | 'deadline' | 'group' | 'personal' | 'other';
   status: 'pending' | 'in_progress' | 'completed' | 'overdue';
+  scheduled_date?: string;
+  start_time?: string | null;
+  end_time?: string | null;
+  priority?: 'high' | 'med' | 'low' | 'none';
+  reminder_enabled?: boolean;
   deadline?: string;
   repeat_type: 'none' | 'daily' | 'weekly' | 'monthly';
   remind_before: number;

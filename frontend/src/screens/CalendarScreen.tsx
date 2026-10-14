@@ -1,640 +1,792 @@
-import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
-import { ChevronRight, Clock, Bell, RepeatIcon, CheckCircle2, Trash2, AlignLeft } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { useEffect, useMemo, useState } from 'react';
+import { Bell, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Clock3, Plus, Repeat2, Trash2, X } from 'lucide-react';
 import { useApp } from '../lib/AppContext';
-import { TaskDetailModal } from '../components/TaskDetailModal';
-import type { Task } from '../lib/supabase';
+import { supabase, type SubTask, type Task } from '../lib/supabase';
 
-// ─────────────────────────────────────────────────────────────
-// Countdown badge – memo để tránh re-render toàn trang
-// ─────────────────────────────────────────────────────────────
-
-// ─────────────────────────────────────────────────────────────
-// Countdown badge – memo để tránh re-render toàn trang
-// ─────────────────────────────────────────────────────────────
-const CountdownBadge = memo(({ deadline, isOver }: { deadline?: string; isOver: boolean }) => {
-  const [display, setDisplay] = useState('');
-  useEffect(() => {
-    if (!deadline) { setDisplay('Không có hạn'); return; }
-    const tick = () => {
-      const diff = new Date(deadline).getTime() - Date.now();
-      if (diff <= 0) { setDisplay('Hết hạn'); return; }
-      const h = Math.floor(diff / 3600000);
-      const m = Math.floor((diff % 3600000) / 60000);
-      const s = Math.floor((diff % 60000) / 1000);
-      setDisplay(`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`);
-    };
-    tick();
-    const t = setInterval(tick, 1000);
-    return () => clearInterval(t);
-  }, [deadline]);
-  return (
-    <span className="font-mono text-base font-bold" style={{ color: isOver ? '#FF4D4D' : '#0B2113' }}>
-      {display}
-    </span>
-  );
-});
-
-// ─────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────
-function getDayName(d: Date) {
-  const day = d.getDay();
-  return day === 0 ? 'CN' : `T${day + 1}`;
-}
-function isSameDay(a: Date, b: Date) {
-  return a.getDate() === b.getDate() && a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear();
-}
-function getProgress(task: Task) {
-  if (!task.deadline) return 0;
-  const created = new Date(task.created_at).getTime();
-  const deadline = new Date(task.deadline).getTime();
-  const now = Date.now();
-  return Math.min(100, Math.max(0, ((now - created) / (deadline - created)) * 100));
-}
-function timeToTop(timeStr: string): number {
-  const [h, m] = timeStr.split(':').map(Number);
-  return (h - 7) * 60 + m;
-}
-function deadlineToTimeStr(iso: string) {
-  const d = new Date(iso);
-  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-}
-
-const TAG_MAP: Record<string, { bg: string; text: string; label: string }> = {
-  study:    { bg: '#E1F0FF', text: '#4A90E2', label: 'HỌC TẬP' },
-  deadline: { bg: '#FFE5E5', text: '#FF7070', label: 'DEADLINE' },
-  group:    { bg: '#E8F5E9', text: '#15803D', label: 'NHÓM' },
-  personal: { bg: '#fef7e0', text: '#b06000', label: 'CÁ NHÂN' },
-  other:    { bg: '#f1f3f4', text: '#5f6368', label: 'KHÁC' },
-};
-const CARD_COLORS: Record<string, string> = {
-  study: '#166534', deadline: '#991B1B', group: '#1D4ED8', personal: '#92400E', other: '#374151',
+type Category = Task['category'];
+type Priority = NonNullable<Task['priority']>;
+type DraftSubtask = { id?: string; title: string; completed: boolean };
+type TaskDraft = {
+  title: string;
+  description: string;
+  scheduledDate: string;
+  allDay: boolean;
+  startTime: string;
+  endTime: string;
+  category: Category;
+  priority: Priority;
+  reminderEnabled: boolean;
+  deadlineDate: string;
+  deadlineTime: string;
+  repeatType: Task['repeat_type'];
+  remindBefore: number;
+  subtasks: DraftSubtask[];
 };
 
-// ─────────────────────────────────────────────────────────────
-// Main Screen
-// ─────────────────────────────────────────────────────────────
-export function CalendarScreen() {
+const CATEGORY_STYLE: Record<Category, { label: string; color: string; background: string }> = {
+  study: { label: 'Học tập', color: '#286849', background: '#E6F5EA' },
+  deadline: { label: 'Deadline', color: '#B44E25', background: '#FFF0E7' },
+  group: { label: 'Nhóm', color: '#6550B5', background: '#F0EDFF' },
+  personal: { label: 'Cá nhân', color: '#167D85', background: '#E5F7F6' },
+  other: { label: 'Khác', color: '#596579', background: '#EDF0F4' },
+};
+
+const PRIORITY_LABEL: Record<Priority, string> = {
+  high: 'Cao',
+  med: 'Vừa',
+  low: 'Thấp',
+  none: 'Không',
+};
+
+const WEEKDAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+const HOURS = Array.from({ length: 17 }, (_, index) => index + 6);
+
+function dateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function parseDate(value: string) {
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function localDate(value?: string | null) {
+  if (!value) return '';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : dateKey(date);
+}
+
+function dateForTask(task: Task) {
+  return task.scheduled_date || localDate(task.deadline) || localDate(task.created_at);
+}
+
+function addDays(date: Date, amount: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + amount);
+  return next;
+}
+
+function mondayOf(date: Date) {
+  const monday = new Date(date);
+  monday.setHours(0, 0, 0, 0);
+  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+  return monday;
+}
+
+function deadlineParts(deadline?: string) {
+  if (!deadline) return { date: '', time: '23:59' };
+  const parsed = new Date(deadline);
+  if (Number.isNaN(parsed.getTime())) return { date: '', time: '23:59' };
+  return {
+    date: dateKey(parsed),
+    time: `${String(parsed.getHours()).padStart(2, '0')}:${String(parsed.getMinutes()).padStart(2, '0')}`,
+  };
+}
+
+function toDeadline(date: string, time: string) {
+  if (!date) return null;
+  const parsed = new Date(`${date}T${time || '23:59'}`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
+function timeLabel(value?: string | null) {
+  return value ? value.slice(0, 5) : '';
+}
+
+function taskDeadlineDate(task: Task) {
+  return localDate(task.deadline);
+}
+
+function createDraft(date: string, task?: Task): TaskDraft {
+  const deadline = deadlineParts(task?.deadline);
+  const subtasks = task?.subtasks?.map(item => ({
+    id: item.id,
+    title: item.title,
+    completed: item.completed,
+  })) ?? [];
+  return {
+    title: task?.title ?? '',
+    description: task?.description ?? '',
+    scheduledDate: task ? dateForTask(task) : date,
+    allDay: !task?.start_time,
+    startTime: task?.start_time ? timeLabel(task.start_time) : '09:00',
+    endTime: task?.end_time ? timeLabel(task.end_time) : '10:00',
+    category: task?.category ?? 'study',
+    priority: task?.priority ?? 'none',
+    reminderEnabled: task?.reminder_enabled ?? false,
+    deadlineDate: deadline.date,
+    deadlineTime: deadline.time,
+    repeatType: task?.repeat_type ?? 'none',
+    remindBefore: task?.remind_before ?? 15,
+    subtasks,
+  };
+}
+
+function deadlineRemaining(deadline: string, now: number) {
+  const distance = new Date(deadline).getTime() - now;
+  if (Number.isNaN(distance)) return '';
+  if (distance < 0) {
+    const overdue = Math.abs(distance);
+    const days = Math.floor(overdue / 86_400_000);
+    return days > 0 ? `Trễ ${days} ngày` : `Trễ ${Math.max(1, Math.floor(overdue / 60_000))} phút`;
+  }
+  const days = Math.floor(distance / 86_400_000);
+  if (days > 0) return `Còn ${days} ngày`;
+  const hours = Math.floor(distance / 3_600_000);
+  const minutes = Math.floor((distance % 3_600_000) / 60_000);
+  return hours > 0 ? `Còn ${hours} giờ ${minutes} phút` : `Còn ${Math.max(1, minutes)} phút`;
+}
+
+export default function CalendarScreen() {
   const { user, tasks, refreshTasks } = useApp();
-
-  const [selectedDate, setSelectedDate] = useState(new Date());
-  const [weekStart, setWeekStart] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - d.getDay() + 1);
-    d.setHours(0, 0, 0, 0);
-    return d;
-  });
-  const [showAdd, setShowAdd] = useState(false);
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [selectedDate, setSelectedDate] = useState(() => new Date());
+  const [visibleMonth, setVisibleMonth] = useState(() => new Date());
+  const [monthExpanded, setMonthExpanded] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'timeline'>('list');
+  const [draft, setDraft] = useState<TaskDraft | null>(null);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [saving, setSaving] = useState(false);
-  const [nowTime, setNowTime] = useState(new Date());
-  const [selectedDuration, setSelectedDuration] = useState('1h');
-
-  const [form, setForm] = useState({
-    title: '',
-    category: 'study' as Task['category'],
-    startTime: '08:00',
-    endTime: '10:00',
-    color: '#D8FF7F',
-    deadline: '',
-    deadlineTime: '',
-    repeat: 'none' as Task['repeat_type'],
-    remind: '60',
-    description: '',
-    tag: 'Kinh tế',
-  });
+  const [error, setError] = useState('');
+  const [now, setNow] = useState(() => Date.now());
+  const selectedKey = dateKey(selectedDate);
 
   useEffect(() => {
-    const t = setInterval(() => setNowTime(new Date()), 60000);
-    return () => clearInterval(t);
+    const interval = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(interval);
   }, []);
 
-  const weekDays = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(weekStart);
-    d.setDate(d.getDate() + i);
-    return d;
-  });
+  const weekDays = useMemo(() => {
+    const start = mondayOf(selectedDate);
+    return Array.from({ length: 7 }, (_, index) => addDays(start, index));
+  }, [selectedDate]);
 
-  const filteredTasks = tasks.filter(t => {
-    const ref = t.deadline ? new Date(t.deadline) : new Date(t.created_at);
-    return isSameDay(ref, selectedDate);
-  });
+  const monthDays = useMemo(() => {
+    const first = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), 1);
+    const start = mondayOf(first);
+    return Array.from({ length: 42 }, (_, index) => addDays(start, index));
+  }, [visibleMonth]);
 
-  // ── Toggle hoàn thành ──────────────────────────────────────
-  const toggleComplete = useCallback(async (task: Task, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const newStatus = task.status === 'completed' ? 'pending' : 'completed';
-    await supabase.from('tasks').update({
-      status: newStatus,
-      completed_at: newStatus === 'completed' ? new Date().toISOString() : null,
-    }).eq('id', task.id);
-    await refreshTasks();
-  }, [refreshTasks]);
+  const dayTasks = useMemo(() => {
+    const dueOrScheduled = tasks.filter(task =>
+      dateForTask(task) === selectedKey || taskDeadlineDate(task) === selectedKey
+    );
+    const overdue = selectedKey === dateKey(new Date())
+      ? tasks.filter(task => task.status !== 'completed' && task.deadline && new Date(task.deadline).getTime() < now)
+      : [];
+    const unique = new Map([...overdue, ...dueOrScheduled].map(task => [task.id, task]));
+    return [...unique.values()].sort((a, b) => {
+      const aOverdue = a.status !== 'completed' && !!a.deadline && new Date(a.deadline).getTime() < now;
+      const bOverdue = b.status !== 'completed' && !!b.deadline && new Date(b.deadline).getTime() < now;
+      if (aOverdue !== bOverdue) return aOverdue ? -1 : 1;
+      const priorityOrder: Record<Priority, number> = { high: 0, med: 1, low: 2, none: 3 };
+      const priorityDiff = priorityOrder[a.priority ?? 'none'] - priorityOrder[b.priority ?? 'none'];
+      if (priorityDiff !== 0) return priorityDiff;
+      return (a.start_time ?? '').localeCompare(b.start_time ?? '') ||
+        (a.deadline ?? '').localeCompare(b.deadline ?? '');
+    });
+  }, [now, selectedKey, tasks]);
 
-  // ── Xoá nhiệm vụ ──────────────────────────────────────────
-  const deleteTask = useCallback(async (taskId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!window.confirm('Xoá nhiệm vụ này?')) return;
-    await supabase.from('tasks').delete().eq('id', taskId);
-    if (selectedTask?.id === taskId) setSelectedTask(null);
-    await refreshTasks();
-  }, [selectedTask, refreshTasks]);
+  const openNewTask = () => {
+    setEditingTask(null);
+    setError('');
+    setDraft(createDraft(selectedKey));
+  };
 
-  // ── Thêm nhiệm vụ mới ──────────────────────────────────────
-  async function addTask() {
-    if (!form.title.trim()) {
-      alert('Vui lòng nhập tên nhiệm vụ!');
+  const openEditTask = (task: Task) => {
+    setEditingTask(task);
+    setError('');
+    setDraft(createDraft(selectedKey, task));
+  };
+
+  const closeEditor = () => {
+    if (saving) return;
+    setDraft(null);
+    setEditingTask(null);
+    setError('');
+  };
+
+  const patchDraft = (updates: Partial<TaskDraft>) => {
+    setDraft(current => current ? { ...current, ...updates } : current);
+  };
+
+  const saveTask = async () => {
+    if (!draft || !user) return;
+    if (!draft.title.trim()) {
+      setError('Vui lòng nhập tên công việc.');
       return;
     }
-    if (!user) {
-      alert('Vui lòng đăng nhập để lưu nhiệm vụ của bạn!');
+    if (!draft.allDay && draft.startTime >= draft.endTime) {
+      setError('Giờ kết thúc cần sau giờ bắt đầu.');
       return;
     }
+
     setSaving(true);
+    setError('');
+    const taskPayload = {
+      title: draft.title.trim(),
+      description: draft.description.trim() || null,
+      scheduled_date: draft.scheduledDate || null,
+      start_time: draft.allDay ? null : draft.startTime,
+      end_time: draft.allDay ? null : draft.endTime,
+      category: draft.category,
+      priority: draft.priority,
+      reminder_enabled: draft.reminderEnabled,
+      deadline: toDeadline(draft.deadlineDate, draft.deadlineTime),
+      repeat_type: draft.repeatType,
+      remind_before: draft.remindBefore,
+    };
+
+    let taskSaved = false;
     try {
-      let deadline: string | undefined;
-      if (form.category === 'deadline' && form.deadline) {
-        deadline = `${form.deadline}T${form.deadlineTime || '23:59'}:00`;
-      } else if (form.category === 'study') {
-        const sel = selectedDate.toISOString().split('T')[0];
-        deadline = `${sel}T${form.endTime}:00`;
+      let taskId = editingTask?.id;
+      if (editingTask) {
+        const { error: updateError } = await supabase
+          .from('tasks')
+          .update(taskPayload)
+          .eq('id', editingTask.id)
+          .eq('user_id', user.id);
+        if (updateError) throw updateError;
+      } else {
+        const { data, error: insertError } = await supabase
+          .from('tasks')
+          .insert({ ...taskPayload, user_id: user.id, status: 'pending' })
+          .select('id')
+          .single();
+        if (insertError) throw insertError;
+        taskId = data.id as string;
+      }
+      taskSaved = true;
+
+      const existing = editingTask?.subtasks ?? [];
+      const draftIds = new Set(draft.subtasks.map(item => item.id).filter(Boolean));
+      const removedIds = existing.filter(item => !draftIds.has(item.id)).map(item => item.id);
+      if (removedIds.length > 0 && taskId) {
+        const { error: deleteError } = await supabase
+          .from('subtasks')
+          .delete()
+          .eq('task_id', taskId)
+          .eq('user_id', user.id)
+          .in('id', removedIds);
+        if (deleteError) throw deleteError;
       }
 
-      await supabase.from('tasks').insert({
+      const changedSubtasks = draft.subtasks.filter(item => item.title.trim());
+      const existingUpdates = changedSubtasks.filter(item => item.id).map(item => ({
+        id: item.id,
+        task_id: taskId,
         user_id: user.id,
-        title: form.title,
-        category: form.category,
-        deadline,
-        repeat_type: form.repeat,
-        remind_before: parseInt(form.remind),
-        description: form.description,
-        status: 'pending',
-      });
+        title: item.title.trim(),
+        completed: item.completed,
+      }));
+      const newSubtasks = changedSubtasks.filter(item => !item.id).map(item => ({
+        task_id: taskId,
+        user_id: user.id,
+        title: item.title.trim(),
+        completed: item.completed,
+      }));
+
+      if (existingUpdates.length > 0) {
+        const { error: updateSubtasksError } = await supabase.from('subtasks').upsert(existingUpdates);
+        if (updateSubtasksError) throw updateSubtasksError;
+      }
+      if (newSubtasks.length > 0) {
+        const { error: insertSubtasksError } = await supabase.from('subtasks').insert(newSubtasks);
+        if (insertSubtasksError) throw insertSubtasksError;
+      }
+
       await refreshTasks();
+      if (!editingTask && draft.scheduledDate) {
+        const createdDate = parseDate(draft.scheduledDate);
+        setSelectedDate(createdDate);
+        setVisibleMonth(createdDate);
+      }
+      setDraft(null);
+      setEditingTask(null);
+    } catch (saveError) {
+      console.error('Unable to save task:', saveError);
+      setError(taskSaved
+        ? 'Công việc đã lưu nhưng checklist chưa cập nhật được. Hãy tải lại dữ liệu và kiểm tra các bước nhỏ.'
+        : 'Không thể lưu công việc. Hãy kiểm tra kết nối hoặc chạy migration Supabase mới nhất rồi thử lại.');
     } finally {
       setSaving(false);
     }
-    setForm({ title: '', category: 'study', startTime: '08:00', endTime: '10:00', color: '#D8FF7F', deadline: '', deadlineTime: '', repeat: 'none', remind: '60', description: '', tag: 'Kinh tế' });
-    setShowAdd(false);
-  }
+  };
 
-  const nowTop = timeToTop(`${String(nowTime.getHours()).padStart(2,'0')}:${String(nowTime.getMinutes()).padStart(2,'0')}`);
-  const HOUR_HEIGHT = 60;
-  const HOURS = ['07:00','08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00'];
-  const TOTAL_MINUTES = HOURS.length * 60;
-  const COLORS = ['#D8FF7F','#60A5FA','#C084FC','#FB7185','#FB923C','#2DD4BF'];
-  const TAGS = ['Kinh tế','Toán rời rạc','Lập trình','Vật lý','Tiếng Anh'];
-  const DURATIONS = ['15p','30p','1h','2h'];
-  const REMIND_LABELS: Record<string, string> = { '15': 'Trước 15 phút','30': 'Trước 30 phút','60': 'Trước 1 giờ','1440': 'Trước 1 ngày' };
-  const REPEAT_LABELS: Record<string, string> = { none: 'Không lặp', daily: 'Hàng ngày', weekly: 'Hàng tuần', monthly: 'Hàng tháng' };
+  const toggleComplete = async (task: Task) => {
+    if (!user) return;
+    const status = task.status === 'completed' ? 'pending' : 'completed';
+    const { error: updateError } = await supabase
+      .from('tasks')
+      .update({ status, completed_at: status === 'completed' ? new Date().toISOString() : null })
+      .eq('id', task.id)
+      .eq('user_id', user.id);
+    if (updateError) {
+      console.error('Unable to update task status:', updateError);
+      setError('Không thể cập nhật trạng thái công việc.');
+      return;
+    }
+    await refreshTasks();
+  };
+
+  const deleteTask = async (task: Task) => {
+    if (!user || !window.confirm(`Xóa công việc "${task.title}"?`)) return;
+    const { error: deleteError } = await supabase
+      .from('tasks')
+      .delete()
+      .eq('id', task.id)
+      .eq('user_id', user.id);
+    if (deleteError) {
+      console.error('Unable to delete task:', deleteError);
+      setError('Không thể xóa công việc.');
+      return;
+    }
+    await refreshTasks();
+    if (editingTask?.id === task.id) closeEditor();
+  };
+
+  const changeSelectedDate = (date: Date) => {
+    setSelectedDate(date);
+    setVisibleMonth(date);
+  };
+
+  const moveMonth = (amount: number) => {
+    const nextMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + amount, 1);
+    const lastDay = new Date(nextMonth.getFullYear(), nextMonth.getMonth() + 1, 0).getDate();
+    const nextDate = new Date(nextMonth.getFullYear(), nextMonth.getMonth(), Math.min(selectedDate.getDate(), lastDay));
+    setVisibleMonth(nextMonth);
+    setSelectedDate(nextDate);
+  };
+
+  const dayHasTask = (date: Date) => tasks.some(task =>
+    dateForTask(task) === dateKey(date) || taskDeadlineDate(task) === dateKey(date)
+  );
 
   return (
-    <div className="h-[100dvh] flex flex-col bg-[#0B2113] overflow-hidden">
-      {/* ── HEADER ── */}
-      <div className="px-6 pt-10 pb-4 bg-[#0B2113] shrink-0">
-        <div className="flex items-center justify-between mb-2">
-          <h1 className="text-[30px] font-bold leading-[36px] text-white">Lịch học</h1>
-          <button onClick={() => setShowAdd(true)}
-            className="flex items-center gap-1 px-4 py-1.5 rounded-xl border border-[rgba(207,251,43,0.30)] bg-[#0B2113]">
-            <span className="text-[#CFFB2B] text-[14px] font-medium leading-[20px]">+ Thêm</span>
-          </button>
-        </div>
-        <p className="text-[#9CA3AF] text-[14px] mb-4">
-          {selectedDate.toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-        </p>
-
-        {/* Week picker */}
-        <div className="flex items-center gap-1.5 mb-5">
-          <button onClick={() => setWeekStart(d => { const nd = new Date(d); nd.setDate(nd.getDate() - 7); return nd; })}
-            className="p-1 text-[#9CA3AF]">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>
-          </button>
-          <div className="flex-1 flex items-center gap-1">
-            {weekDays.map((d, i) => {
-              const isSelected = isSameDay(d, selectedDate);
-              const isToday = isSameDay(d, new Date());
-              const hasTask = tasks.some(t => isSameDay(new Date(t.deadline || t.created_at), d));
-              return (
-                <button key={i} onClick={() => setSelectedDate(new Date(d))}
-                  className={`flex-1 flex flex-col items-center justify-center relative py-2 rounded-[14px] transition-all ${
-                    isSelected ? 'bg-[#CFFB2B]' : isToday ? 'bg-white/10' : 'bg-white/5'
-                  } outline outline-1 ${hasTask ? 'outline-[#EF4444]' : 'outline-white/10'}`}>
-                  <span className={`text-[10px] leading-[14px] ${isSelected ? 'text-[#0B2113] font-semibold' : 'text-[#9CA3AF]'}`}>
-                    {getDayName(d)}
-                  </span>
-                  <span className={`text-[18px] font-bold ${isSelected ? 'text-[#0B2113]' : 'text-white'}`}>
-                    {d.getDate()}
-                  </span>
-                  {isSelected && <div className="w-1 h-1 rounded-full bg-[#0B2113] absolute bottom-1.5" />}
-                </button>
-              );
-            })}
+    <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-[#0B2113] text-white">
+      <header className="shrink-0 px-5 pb-4 pt-4">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#9BA99E]">Kế hoạch của bạn</p>
+            <h1 className="mt-1 text-[25px] font-extrabold tracking-tight">Quản lý công việc</h1>
           </div>
-          <button onClick={() => setWeekStart(d => { const nd = new Date(d); nd.setDate(nd.getDate() + 7); return nd; })}
-            className="p-1 text-[#9CA3AF]">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
+          <button onClick={openNewTask} aria-label="Thêm công việc"
+            className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#CFFB2B] text-[#0B2113] shadow-lg shadow-lime-950/30">
+            <Plus size={23} strokeWidth={2.5} />
           </button>
         </div>
 
-        {/* Toggle Danh sách / Dòng thời gian */}
-        <div className="w-[240px] max-w-full mx-auto p-1 bg-white/10 rounded-2xl flex">
-          {(['list', 'timeline'] as const).map(mode => (
-            <button key={mode} onClick={() => setViewMode(mode)}
-              className={`flex-1 py-1.5 rounded-xl text-center transition-all ${viewMode === mode ? 'bg-[#CFFB2B]' : ''}`}>
-              <span className={`text-[11px] font-bold uppercase ${viewMode === mode ? 'text-[#0B2113]' : 'text-[#9CA3AF]'}`}>
-                {mode === 'list' ? 'Danh sách' : 'Dòng thời gian'}
-              </span>
+        <div className="mb-3 flex items-center justify-between">
+          <button onClick={() => setMonthExpanded(value => !value)}
+            className="flex items-center gap-2 text-sm font-bold text-white">
+            <CalendarDays size={16} className="text-[#CFFB2B]" />
+            {visibleMonth.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })}
+            <ChevronDown size={15} className={`transition-transform ${monthExpanded ? 'rotate-180' : ''}`} />
+          </button>
+          <div className="flex items-center gap-1">
+            <button onClick={() => moveMonth(-1)} aria-label="Tháng trước" className="rounded-lg p-2 text-[#B6C1B8] hover:bg-white/10">
+              <ChevronLeft size={17} />
             </button>
-          ))}
+            <button onClick={() => { setVisibleMonth(new Date()); setSelectedDate(new Date()); }}
+              className="rounded-lg px-2 py-1 text-[11px] font-bold text-[#CFFB2B]">Hôm nay</button>
+            <button onClick={() => moveMonth(1)} aria-label="Tháng sau" className="rounded-lg p-2 text-[#B6C1B8] hover:bg-white/10">
+              <ChevronRight size={17} />
+            </button>
+          </div>
         </div>
-      </div>
 
-      {/* ── CONTENT ── */}
-      {viewMode === 'list' ? (
-        /* ── LIST VIEW ── */
-        <div className="flex-1 overflow-y-auto bg-[#F3F7F2] rounded-t-[40px] px-6 pt-8 flex flex-col gap-4"
-          style={{ paddingBottom: 'calc(140px + env(safe-area-inset-bottom))' }}>
-          {filteredTasks.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20">
-              <div className="text-5xl mb-4">📋</div>
-              <p className="font-semibold text-[#173325]">Không có nhiệm vụ nào hôm nay</p>
-              <p className="text-sm mt-1 text-[#9aa0a6]">Nhấn "+ Thêm" để tạo nhiệm vụ mới</p>
+        {monthExpanded ? (
+          <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-3">
+            <div className="mb-2 grid grid-cols-7 text-center text-[10px] font-bold text-[#89978C]">
+              {WEEKDAYS.map(day => <span key={day} className="py-1">{day}</span>)}
             </div>
-          ) : (
-            filteredTasks.map(task => {
-              const progress = getProgress(task);
-              const isDone = task.status === 'completed';
-              const isOver = !!task.deadline && new Date(task.deadline) < new Date() && !isDone;
-              const tag = TAG_MAP[task.category] ?? TAG_MAP.other;
-              const pbBg = (task.category === 'deadline' || isOver) ? '#FF4D4D' : '#166534';
-
-              return (
-                <div key={task.id} onClick={() => setSelectedTask(task)}
-                  className={`shrink-0 relative overflow-hidden rounded-[24px] border border-[#F3F4F6] shadow-sm bg-white p-5 flex flex-col ${isDone ? 'opacity-60' : ''}`}>
-                  <div className="flex items-start gap-4">
-                    {/* Checkbox */}
-                    <button onClick={e => toggleComplete(task, e)} className="pt-0.5 shrink-0 active:scale-90 transition-transform">
-                      {isDone
-                        ? <div className="w-6 h-6 rounded-full bg-[#DCFCE7] border border-[#22C55E] flex items-center justify-center">
-                            <CheckCircle2 size={14} className="text-[#16A34A]" />
-                          </div>
-                        : <div className="w-6 h-6 rounded-full border-2 border-[#D1D5DB]" />
-                      }
-                    </button>
-
-                    <div className="flex-1 flex flex-col min-w-0">
-                      <h3 className={`text-[17px] font-bold mb-2 truncate ${isDone ? 'text-[#9CA3AF] line-through' : 'text-[#0B2113]'}`}>
-                        {task.title}
-                      </h3>
-
-                      {/* Tags */}
-                      <div className="flex flex-wrap gap-2 mb-3">
-                        <div className="px-2 py-[2px] rounded-full" style={{ background: tag.bg }}>
-                          <span className="text-[10px] font-bold uppercase" style={{ color: tag.text }}>{tag.label}</span>
-                        </div>
-                        {!isDone && progress >= 70 && !isOver && (
-                          <div className="px-2 py-[2px] rounded-full bg-[#FFF4E5]">
-                            <span className="text-[10px] font-bold uppercase text-[#FFA84A]">Sắp hết hạn</span>
-                          </div>
-                        )}
-                        {isOver && (
-                          <div className="px-2 py-[2px] rounded-full bg-[#FFE5E5]">
-                            <span className="text-[10px] font-bold uppercase text-[#FF7070]">Quá hạn</span>
-                          </div>
-                        )}
-                        {task.repeat_type !== 'none' && (
-                          <div className="px-2 py-[2px] rounded-full bg-[#F3F4F6] flex items-center gap-1">
-                            <RepeatIcon size={8} className="text-[#6B7280]" />
-                            <span className="text-[10px] font-bold uppercase text-[#6B7280]">Lặp lại</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Time + Countdown */}
-                      <div className="flex items-center justify-between mt-1">
-                        <span className="text-gray-400 text-xs font-medium">
-                          ⏰ {task.deadline ? new Date(task.deadline).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : 'Không có hạn'}
-                        </span>
-                        {!isDone && <CountdownBadge deadline={task.deadline} isOver={isOver} />}
-                      </div>
-                    </div>
-
-                    {/* Delete button */}
-                    <button onClick={e => deleteTask(task.id, e)} className="p-1.5 rounded-full hover:bg-red-50 transition-colors shrink-0">
-                      <Trash2 size={14} className="text-[#D1D5DB] hover:text-red-400" />
-                    </button>
-                  </div>
-
-                  {/* Progress bar */}
-                  {!isDone && (
-                    <>
-                      <div className="absolute left-[1px] bottom-0 w-[calc(100%-2px)] h-[6px] bg-[#F3F4F6]" />
-                      <div className="absolute left-[1px] bottom-0 h-[6px] rounded-tr-full transition-all duration-1000"
-                        style={{ width: `${Math.max(5, progress)}%`, background: pbBg }} />
-                    </>
-                  )}
-                </div>
-              );
-            })
-          )}
-          <div className="h-4" />
-        </div>
-      ) : (
-        /* ── TIMELINE VIEW ── */
-        <div className="flex-1 overflow-y-auto bg-[#F3F7F2] rounded-t-[40px]"
-          style={{ paddingBottom: 'calc(140px + env(safe-area-inset-bottom))' }}>
-          <div className="flex px-2 pt-6" style={{ minHeight: `${TOTAL_MINUTES + 48}px` }}>
-            {/* Trục giờ */}
-            <div className="w-[56px] flex flex-col shrink-0">
-              {HOURS.map(h => (
-                <div key={h} style={{ height: HOUR_HEIGHT }} className="flex items-start justify-center pt-1">
-                  <span className="text-[10px] font-bold text-[#9CA3AF]">{h}</span>
-                </div>
-              ))}
-            </div>
-
-            {/* Nội dung timeline */}
-            <div className="flex-1 relative border-l border-[#E5E7EB]" style={{ height: `${TOTAL_MINUTES}px` }}>
-              {HOURS.map((_, i) => (
-                <div key={i} className="absolute left-0 right-0 border-t border-[#E5E7EB]" style={{ top: i * HOUR_HEIGHT }} />
-              ))}
-
-              {/* Kim chỉ giờ hiện tại */}
-              {nowTop >= 0 && nowTop <= TOTAL_MINUTES && (
-                <div className="absolute left-[-4px] right-0 flex items-center pointer-events-none" style={{ top: nowTop }}>
-                  <div className="w-2.5 h-2.5 rounded-full bg-[#EF4444] shrink-0" />
-                  <div className="flex-1 border-t-2 border-[#EF4444]" />
-                </div>
-              )}
-
-              {/* Thẻ nhiệm vụ */}
-              {filteredTasks.filter(t => t.deadline).map(task => {
-                const deadlineStr = deadlineToTimeStr(task.deadline!);
-                const endTop = timeToTop(deadlineStr);
-                const startTop = Math.max(0, endTop - 60);
-                const height = Math.max(40, endTop - startTop);
-                const cardColor = CARD_COLORS[task.category] ?? CARD_COLORS.other;
-                const isDone = task.status === 'completed';
-
+            <div className="grid grid-cols-7 gap-y-1">
+              {monthDays.map(day => {
+                const active = dateKey(day) === selectedKey;
+                const inMonth = day.getMonth() === visibleMonth.getMonth();
                 return (
-                  <div key={task.id}
-                    onClick={() => setSelectedTask(task)}
-                    className={`absolute left-2 right-2 rounded-xl p-2.5 shadow-md cursor-pointer transition-all active:scale-[0.99] ${isDone ? 'opacity-50' : ''}`}
-                    style={{ top: startTop, height, background: cardColor }}>
-                    <p className="text-white text-[12px] font-bold leading-tight truncate">{task.title}</p>
-                    <p className="text-white/70 text-[10px] mt-0.5">{deadlineStr}</p>
-                    {isDone && (
-                      <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-white/20 flex items-center justify-center">
-                        <CheckCircle2 size={10} className="text-white" />
-                      </div>
-                    )}
-                  </div>
+                  <button key={dateKey(day)} onClick={() => changeSelectedDate(day)}
+                    className={`relative mx-auto flex h-9 w-9 items-center justify-center rounded-xl text-xs font-semibold ${
+                      active ? 'bg-[#CFFB2B] text-[#102116]' : inMonth ? 'text-white hover:bg-white/10' : 'text-white/25'
+                    }`}>
+                    {day.getDate()}
+                    {dayHasTask(day) && <span className={`absolute bottom-1 h-1 w-1 rounded-full ${active ? 'bg-[#102116]' : 'bg-[#CFFB2B]'}`} />}
+                  </button>
                 );
               })}
             </div>
           </div>
+        ) : (
+          <div className="flex items-center gap-1">
+            {weekDays.map(day => {
+              const key = dateKey(day);
+              const selected = key === selectedKey;
+              const today = key === dateKey(new Date());
+              return (
+                <button key={key} onClick={() => changeSelectedDate(day)}
+                  className={`relative flex min-w-0 flex-1 flex-col items-center rounded-2xl py-2 ${
+                    selected ? 'bg-[#CFFB2B] text-[#102116]' : 'text-[#AAB5AC] hover:bg-white/[0.07]'
+                  }`}>
+                  <span className="text-[10px] font-semibold">{WEEKDAYS[(day.getDay() + 6) % 7]}</span>
+                  <span className={`mt-1 text-lg font-extrabold ${today && !selected ? 'text-[#CFFB2B]' : ''}`}>{day.getDate()}</span>
+                  {dayHasTask(day) && <span className={`absolute bottom-1 h-1 w-1 rounded-full ${selected ? 'bg-[#102116]' : 'bg-[#CFFB2B]'}`} />}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="mx-auto mt-4 flex w-[250px] max-w-full rounded-xl bg-white/10 p-1">
+          {(['list', 'timeline'] as const).map(mode => (
+            <button key={mode} onClick={() => setViewMode(mode)}
+              className={`flex-1 rounded-lg py-2 text-[10px] font-extrabold uppercase tracking-wider ${
+                viewMode === mode ? 'bg-[#CFFB2B] text-[#112116]' : 'text-[#9AA69C]'
+              }`}>
+              {mode === 'list' ? 'Danh sách' : 'Dòng thời gian'}
+            </button>
+          ))}
         </div>
-      )}
+      </header>
 
-      {/* ── MODAL THÊM MỚI ── */}
-      {showAdd && (
-        <div className="absolute inset-0 z-50 flex items-end bg-black/60 backdrop-blur-[2px]"
-          onClick={() => setShowAdd(false)}>
-          <div className="w-full max-h-[94%] bg-gradient-to-b from-[#122E21] to-[#0B2418] rounded-t-[32px] border-t border-[#424844] flex flex-col"
-            onClick={e => e.stopPropagation()}>
-            {/* Drag handle */}
-            <div className="w-full flex justify-center pt-3 pb-1">
-              <div className="w-10 h-1.5 bg-[#424844]/60 rounded-full" />
+      <main className="min-h-0 flex-1 overflow-y-auto rounded-t-[30px] bg-[#F3F7F2] px-4 pb-8 pt-5 text-[#14281B]">
+        <div className="mb-4 flex items-end justify-between px-1">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#829086]">
+              {selectedDate.toLocaleDateString('vi-VN', { weekday: 'long' })}
+            </p>
+            <h2 className="text-[20px] font-extrabold">
+              {selectedDate.toLocaleDateString('vi-VN', { day: 'numeric', month: 'long' })}
+            </h2>
+          </div>
+          <span className="rounded-full bg-[#E5EDE5] px-3 py-1 text-[11px] font-bold text-[#506251]">
+            {dayTasks.length} công việc
+          </span>
+        </div>
+
+        {error && !draft && (
+          <div role="alert" className="mb-3 flex items-center justify-between rounded-xl bg-red-100 px-3 py-2 text-xs text-red-800">
+            {error}<button onClick={() => setError('')} aria-label="Đóng thông báo"><X size={14} /></button>
+          </div>
+        )}
+
+        {viewMode === 'list' ? (
+          <div className="flex flex-col gap-3">
+            {dayTasks.length === 0 ? (
+              <div className="flex flex-col items-center rounded-3xl bg-white px-5 py-12 text-center shadow-sm">
+                <span className="mb-3 text-4xl">🗓️</span>
+                <p className="font-bold">Chưa có công việc trong ngày</p>
+                <p className="mt-1 text-xs text-[#8C998E]">Nhấn nút + để thêm kế hoạch mới</p>
+                <button onClick={openNewTask} className="mt-5 rounded-xl bg-[#CFFB2B] px-4 py-2 text-xs font-extrabold text-[#132417]">
+                  Thêm công việc
+                </button>
+              </div>
+            ) : dayTasks.map(task => (
+              <TaskCard key={task.id} task={task} now={now} onOpen={openEditTask}
+                onToggle={toggleComplete} onDelete={deleteTask} />
+            ))}
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
+            <div className="relative" style={{ height: `${HOURS.length * 56}px` }}>
+              {HOURS.map(hour => (
+                <div key={hour} className="absolute left-0 right-0 flex border-t border-[#EDF0EC]"
+                  style={{ top: `${(hour - HOURS[0]) * 56}px`, height: '56px' }}>
+                  <span className="w-14 -translate-y-2 px-2 text-[10px] font-semibold text-[#9AA49B]">{String(hour).padStart(2, '0')}:00</span>
+                  <div className="flex-1" />
+                </div>
+              ))}
+              {dayTasks.map(task => {
+                const start = task.start_time ? Number(task.start_time.slice(0, 2)) * 60 + Number(task.start_time.slice(3, 5)) : null;
+                const end = task.end_time ? Number(task.end_time.slice(0, 2)) * 60 + Number(task.end_time.slice(3, 5)) : null;
+                if (start === null || start < HOURS[0] * 60 || start >= 23 * 60) return null;
+                const top = ((start - HOURS[0] * 60) / 60) * 56;
+                const height = Math.max(34, ((Math.max(end ?? start + 60, start + 30) - start) / 60) * 56);
+                const style = CATEGORY_STYLE[task.category];
+                return (
+                  <button key={task.id} onClick={() => openEditTask(task)}
+                    className="absolute left-[58px] right-2 overflow-hidden rounded-lg border-l-[3px] px-2 py-1 text-left"
+                    style={{ top: `${top}px`, height: `${height}px`, background: style.background, borderColor: style.color, color: style.color }}>
+                    <span className="block truncate text-[11px] font-extrabold">{task.title}</span>
+                    <span className="text-[9px] font-semibold">{timeLabel(task.start_time)} – {timeLabel(task.end_time)}</span>
+                  </button>
+                );
+              })}
             </div>
+            {dayTasks.every(task => !task.start_time) && (
+              <p className="border-t border-[#EDF0EC] px-4 py-3 text-xs text-[#7F8C81]">
+                Các công việc trong ngày chưa có giờ bắt đầu/kết thúc.
+              </p>
+            )}
+          </div>
+        )}
+      </main>
 
-            {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-3 border-b border-[#424844]/30">
-              <button onClick={() => setShowAdd(false)} className="text-[#C2C8C2] text-base">Huỷ</button>
-              <h3 className="text-[#DFE3E9] text-lg font-semibold">Thêm mới</h3>
-              <button onClick={addTask} disabled={saving}
-                className="bg-[#D8FF7F] text-[#263500] px-5 py-1.5 rounded-full text-xs font-bold disabled:opacity-50">
-                {saving ? 'Đang lưu...' : 'Lưu'}
+      {draft && (
+        <div className="absolute inset-0 z-40 flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4"
+          onMouseDown={event => { if (event.target === event.currentTarget) closeEditor(); }}>
+          <section role="dialog" aria-modal="true" aria-labelledby="task-editor-title"
+            className="flex max-h-[94%] w-full max-w-lg flex-col overflow-hidden rounded-t-[28px] bg-[#102019] text-white shadow-2xl sm:rounded-[28px]">
+            <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#9BA99E]">Lịch cá nhân</p>
+                <h2 id="task-editor-title" className="mt-1 text-lg font-extrabold">{editingTask ? 'Sửa công việc' : 'Thêm công việc'}</h2>
+              </div>
+              <button onClick={closeEditor} aria-label="Đóng" className="rounded-full p-2 text-[#AAB5AC] hover:bg-white/10">
+                <X size={19} />
               </button>
             </div>
 
-            {/* Modal Body */}
-            <div className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-5 pb-12">
-              {/* Tab Lịch học / Bài tập */}
-              <div className="bg-[#0A0F13] p-1 rounded-xl flex gap-1 border border-[#424844]/20">
-                {[
-                  { key: 'study', label: 'Lịch học' },
-                  { key: 'deadline', label: 'Bài tập' },
-                ].map(tab => (
-                  <button key={tab.key}
-                    onClick={() => setForm(p => ({ ...p, category: tab.key as Task['category'] }))}
-                    className={`flex-1 py-2.5 rounded-lg text-xs font-semibold transition-all ${
-                      form.category === tab.key ? 'bg-[#D8FF7F] text-[#263500]' : 'text-[#C2C8C2]'
-                    }`}>
-                    {tab.label}
-                  </button>
-                ))}
+            <div className="flex-1 overflow-y-auto px-5 py-4">
+              <label className="mb-4 block">
+                <span className="mb-2 block text-[11px] font-bold text-[#B5C0B7]">TÊN CÔNG VIỆC</span>
+                <input autoFocus value={draft.title} onChange={event => patchDraft({ title: event.target.value })}
+                  placeholder="Ví dụ: Làm bài tập Marketing"
+                  className="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm font-semibold outline-none placeholder:text-white/30 focus:border-[#CFFB2B]" />
+              </label>
+
+              <label className="mb-4 block">
+                <span className="mb-2 block text-[11px] font-bold text-[#B5C0B7]">NGÀY LÀM</span>
+                <input type="date" value={draft.scheduledDate} onChange={event => patchDraft({ scheduledDate: event.target.value })}
+                  className="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm outline-none focus:border-[#CFFB2B]" />
+              </label>
+
+              <div className="mb-4 rounded-xl border border-white/10 bg-white/[0.04] p-3">
+                <div className="mb-3 flex items-center justify-between">
+                  <span className="text-xs font-bold">Giờ thực hiện</span>
+                  <label className="flex items-center gap-2 text-[11px] text-[#B5C0B7]">
+                    <input type="checkbox" checked={draft.allDay} onChange={event => patchDraft({ allDay: event.target.checked })}
+                      className="accent-[#CFFB2B]" />
+                    Cả ngày
+                  </label>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="text-[10px] font-semibold text-[#AAB5AC]">BẮT ĐẦU
+                    <input type="time" disabled={draft.allDay} value={draft.startTime}
+                      onChange={event => patchDraft({ startTime: event.target.value })}
+                      className="mt-1 w-full rounded-lg bg-white/[0.08] px-3 py-2 text-sm text-white disabled:opacity-40" />
+                  </label>
+                  <label className="text-[10px] font-semibold text-[#AAB5AC]">KẾT THÚC
+                    <input type="time" disabled={draft.allDay} value={draft.endTime}
+                      onChange={event => patchDraft({ endTime: event.target.value })}
+                      className="mt-1 w-full rounded-lg bg-white/[0.08] px-3 py-2 text-sm text-white disabled:opacity-40" />
+                  </label>
+                </div>
               </div>
 
-              {/* ── Lịch học form ── */}
-              {form.category === 'study' ? (
-                <>
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[#C2C8C2] text-[11px] font-bold uppercase tracking-wider">TÊN MÔN HỌC</label>
-                    <div className="bg-[#171C20] rounded-xl border border-[#424844]/30 px-4 py-3">
-                      <input type="text" value={form.title}
-                        onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
-                        placeholder="Ví dụ: Toán rời rạc"
-                        className="bg-transparent w-full outline-none text-white text-[18px] font-semibold placeholder:text-[#C2C8C2]/30" />
-                    </div>
-                  </div>
+              <fieldset className="mb-4">
+                <legend className="mb-2 text-[11px] font-bold text-[#B5C0B7]">DANH MỤC</legend>
+                <div className="flex flex-wrap gap-2">
+                  {(Object.keys(CATEGORY_STYLE) as Category[]).map(category => {
+                    const selected = draft.category === category;
+                    return (
+                      <button key={category} type="button" onClick={() => patchDraft({ category })}
+                        className={`rounded-full border px-3 py-2 text-[11px] font-bold ${selected ? 'border-[#CFFB2B] bg-[#CFFB2B]/15 text-[#D8FF7F]' : 'border-white/10 text-[#AAB5AC]'}`}>
+                        {CATEGORY_STYLE[category].label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </fieldset>
 
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[#C2C8C2] text-[11px] font-bold uppercase tracking-wider">MÀU SẮC</label>
-                    <div className="bg-[#171C20] rounded-xl border border-[#424844]/30 p-4 flex justify-between items-center">
-                      {COLORS.map(color => (
-                        <button key={color}
-                          onClick={() => setForm(p => ({ ...p, color }))}
-                          className={`w-8 h-8 rounded-full transition-all ${form.color === color ? 'ring-4 ring-offset-2 ring-offset-[#0B2418]' : ''}`}
-                          style={{ background: color }} />
-                      ))}
-                    </div>
-                  </div>
+              <fieldset className="mb-4">
+                <legend className="mb-2 text-[11px] font-bold text-[#B5C0B7]">ĐỘ ƯU TIÊN</legend>
+                <div className="grid grid-cols-4 gap-2">
+                  {(['high', 'med', 'low', 'none'] as Priority[]).map(priority => (
+                    <button key={priority} type="button" onClick={() => patchDraft({ priority })}
+                      className={`rounded-lg border py-2 text-[10px] font-bold ${draft.priority === priority ? 'border-[#CFFB2B] bg-[#CFFB2B] text-[#152219]' : 'border-white/10 text-[#AAB5AC]'}`}>
+                      {PRIORITY_LABEL[priority]}
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
 
-                  <div className="flex gap-4">
-                    {[
-                      { label: 'BẮT ĐẦU', key: 'startTime' as const },
-                      { label: 'KẾT THÚC', key: 'endTime' as const },
-                    ].map(({ label, key }) => (
-                      <div key={key} className="flex-1 flex flex-col gap-2">
-                        <label className="text-[#C2C8C2] text-[11px] font-bold uppercase tracking-wider">{label}</label>
-                        <div className="bg-[#171C20] rounded-xl border border-[#424844]/30 p-3 flex items-center gap-2">
-                          <Clock size={18} className="text-[#D8FF7F] shrink-0" />
-                          <input type="time" value={form[key]}
-                            onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))}
-                            className="bg-transparent text-white text-base font-semibold outline-none w-full"
-                            style={{ colorScheme: 'dark' }} />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+              <label className="mb-4 flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3">
+                <span className="flex items-center gap-2 text-xs font-semibold"><Bell size={15} className="text-[#CFFB2B]" />Nhắc nhở</span>
+                <input type="checkbox" checked={draft.reminderEnabled}
+                  onChange={event => patchDraft({ reminderEnabled: event.target.checked })}
+                  className="h-4 w-4 accent-[#CFFB2B]" />
+              </label>
 
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[#C2C8C2] text-[11px] font-bold uppercase tracking-wider">CHU KỲ LẶP LẠI</label>
-                    <div className="bg-[#171C20] rounded-xl border border-[#424844]/30 p-4 flex items-center justify-between relative">
-                      <select value={form.repeat}
-                        onChange={e => setForm(p => ({ ...p, repeat: e.target.value as any }))}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
-                        {Object.entries(REPEAT_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                      </select>
-                      <span className="text-[#DFE3E9] text-base pointer-events-none">{REPEAT_LABELS[form.repeat]}</span>
-                      <ChevronRight size={18} className="text-[#C2C8C2] rotate-90 pointer-events-none" />
-                    </div>
-                  </div>
+              <div className="mb-4">
+                <span className="mb-2 block text-[11px] font-bold text-[#B5C0B7]">DEADLINE (TÙY CHỌN)</span>
+                <div className="grid grid-cols-2 gap-2">
+                  <input aria-label="Ngày deadline" type="date" value={draft.deadlineDate}
+                    onChange={event => patchDraft({ deadlineDate: event.target.value })}
+                    className="min-w-0 rounded-xl border border-white/10 bg-white/[0.06] px-3 py-3 text-xs outline-none focus:border-[#CFFB2B]" />
+                  <input aria-label="Giờ deadline" type="time" value={draft.deadlineTime}
+                    onChange={event => patchDraft({ deadlineTime: event.target.value })}
+                    className="min-w-0 rounded-xl border border-white/10 bg-white/[0.06] px-3 py-3 text-xs outline-none focus:border-[#CFFB2B]" />
+                </div>
+                <button type="button" onClick={() => patchDraft({ deadlineDate: '' })}
+                  className="mt-2 text-[10px] font-bold text-[#A8B6AA] underline">Bỏ deadline</button>
+              </div>
 
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[#C2C8C2] text-[11px] font-bold uppercase tracking-wider">NHẮC NHỞ</label>
-                    <div className="bg-[#171C20] rounded-xl border border-[#424844]/30 p-4 flex items-center justify-between relative">
-                      <select value={form.remind}
-                        onChange={e => setForm(p => ({ ...p, remind: e.target.value }))}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
-                        {Object.entries(REMIND_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                      </select>
-                      <div className="flex items-center gap-2 pointer-events-none">
-                        <Bell size={18} className="text-[#D8FF7F]" />
-                        <span className="text-[#DFE3E9] text-base">{REMIND_LABELS[form.remind]}</span>
-                      </div>
-                      <ChevronRight size={18} className="text-[#424844] pointer-events-none" />
-                    </div>
-                  </div>
+              <div className="mb-4 grid grid-cols-2 gap-3">
+                <label className="text-[10px] font-bold text-[#B5C0B7]">LẶP LẠI
+                  <select value={draft.repeatType} onChange={event => patchDraft({ repeatType: event.target.value as Task['repeat_type'] })}
+                    className="mt-2 w-full rounded-xl border border-white/10 bg-[#1B2A21] px-3 py-3 text-xs text-white">
+                    <option value="none">Không lặp</option>
+                    <option value="daily">Hàng ngày</option>
+                    <option value="weekly">Hàng tuần</option>
+                    <option value="monthly">Hàng tháng</option>
+                  </select>
+                </label>
+                <label className="text-[10px] font-bold text-[#B5C0B7]">NHẮC TRƯỚC
+                  <select value={draft.remindBefore} onChange={event => patchDraft({ remindBefore: Number(event.target.value) })}
+                    className="mt-2 w-full rounded-xl border border-white/10 bg-[#1B2A21] px-3 py-3 text-xs text-white">
+                    <option value={0}>Đúng giờ</option>
+                    <option value={5}>5 phút</option>
+                    <option value={15}>15 phút</option>
+                    <option value={30}>30 phút</option>
+                    <option value={60}>1 giờ</option>
+                    <option value={1440}>1 ngày</option>
+                  </select>
+                </label>
+              </div>
 
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[#C2C8C2] text-[11px] font-bold uppercase tracking-wider">GHI CHÚ</label>
-                    <div className="bg-[#171C20] rounded-xl border border-[#424844]/30 px-4 py-3 flex items-start gap-2">
-                      <AlignLeft size={16} className="text-[#8C928D] mt-1 shrink-0" />
-                      <input type="text" value={form.description}
-                        onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
-                        placeholder="Thêm ghi chú..."
-                        className="bg-transparent w-full outline-none text-[#C2C8C2] text-sm" />
-                    </div>
-                  </div>
-                </>
-              ) : (
-                /* ── Bài tập form ── */
-                <>
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[#8C928D] text-[11px] font-bold uppercase tracking-wider">TÊN BÀI TẬP</label>
-                    <div className="bg-[#171C20] rounded-xl border border-[#424844]/30 px-4 py-3">
-                      <input type="text" value={form.title}
-                        onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
-                        placeholder="Nộp báo cáo EXE101"
-                        className="bg-transparent w-full outline-none text-white text-[18px] font-semibold placeholder:text-[#C2C8C2]/30" />
-                    </div>
-                  </div>
+              <label className="mb-4 block">
+                <span className="mb-2 block text-[11px] font-bold text-[#B5C0B7]">GHI CHÚ</span>
+                <textarea rows={2} value={draft.description} onChange={event => patchDraft({ description: event.target.value })}
+                  placeholder="Thêm ghi chú cho công việc..."
+                  className="w-full resize-none rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-xs outline-none placeholder:text-white/30 focus:border-[#CFFB2B]" />
+              </label>
 
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[#8C928D] text-[11px] font-bold uppercase tracking-wider">GẮNG THẺ MÔN HỌC</label>
-                    <div className="flex items-center gap-2 overflow-x-auto">
-                      {TAGS.map(tag => (
-                        <button key={tag}
-                          onClick={() => setForm(p => ({ ...p, tag }))}
-                          className={`flex items-center gap-1.5 px-3 py-2 rounded-full shrink-0 transition-all ${
-                            form.tag === tag ? 'bg-[#D8FF7F]/20 border border-[#D8FF7F]' : 'bg-[#262A2F]'
-                          }`}>
-                          <div className={`w-2 h-2 rounded-full ${form.tag === tag ? 'bg-[#D8FF7F]' : 'bg-[#9CA3AF]'}`} />
-                          <span className={`text-[12px] font-semibold ${form.tag === tag ? 'text-[#D8FF7F]' : 'text-[#C2C8C2]'}`}>{tag}</span>
-                        </button>
-                      ))}
+              <div className="mb-2">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-[#B5C0B7]">CÁC BƯỚC NHỎ</span>
+                  <span className="text-[10px] text-[#9BA99E]">
+                    {draft.subtasks.filter(item => item.completed).length}/{draft.subtasks.length}
+                  </span>
+                </div>
+                <div className="flex flex-col gap-2">
+                  {draft.subtasks.map((subtask, index) => (
+                    <div key={subtask.id ?? `new-${index}`} className="flex items-center gap-2">
+                      <input aria-label="Hoàn thành bước" type="checkbox" checked={subtask.completed}
+                        onChange={event => patchDraft({ subtasks: draft.subtasks.map((item, itemIndex) =>
+                          itemIndex === index ? { ...item, completed: event.target.checked } : item
+                        ) })}
+                        className="h-4 w-4 accent-[#CFFB2B]" />
+                      <input value={subtask.title} onChange={event => patchDraft({ subtasks: draft.subtasks.map((item, itemIndex) =>
+                        itemIndex === index ? { ...item, title: event.target.value } : item
+                      ) })}
+                        placeholder="Tên bước"
+                        className="min-w-0 flex-1 rounded-lg border border-white/10 bg-white/[0.06] px-3 py-2 text-xs outline-none focus:border-[#CFFB2B]" />
+                      <button type="button" aria-label="Xóa bước" onClick={() => patchDraft({
+                        subtasks: draft.subtasks.filter((_, itemIndex) => itemIndex !== index),
+                      })} className="rounded-lg p-2 text-[#AAB5AC] hover:bg-white/10">
+                        <Trash2 size={14} />
+                      </button>
                     </div>
-                  </div>
+                  ))}
+                  <button type="button" onClick={() => patchDraft({ subtasks: [...draft.subtasks, { title: '', completed: false }] })}
+                    className="flex items-center gap-1 self-start py-1 text-[11px] font-bold text-[#D8FF7F]">
+                    <Plus size={14} /> Thêm bước
+                  </button>
+                </div>
+              </div>
 
-                  <div className="flex flex-col gap-2">
-                    <div className="flex justify-between items-center">
-                      <label className="text-[#8C928D] text-[11px] font-bold uppercase tracking-wider">HẠN NỘP (DEADLINE)</label>
-                      {form.deadline && form.deadlineTime && (() => {
-                        const diff = new Date(`${form.deadline}T${form.deadlineTime}`).getTime() - Date.now();
-                        if (diff > 0) {
-                          const h = Math.floor(diff / 3600000);
-                          return <span className="text-[12px] font-semibold text-[#F54647]">Còn {h} giờ nữa</span>;
-                        }
-                        return <span className="text-[12px] font-semibold text-[#F54647]">Đã quá hạn</span>;
-                      })()}
-                    </div>
-                    <div className="flex gap-2">
-                      <div className="flex-1 bg-[#171C20] rounded-xl border border-[#424844]/30 px-3 py-3 flex items-center gap-2">
-                        <Clock size={16} className="text-[#D8FF7F] shrink-0" />
-                        <input type="date"
-                          value={form.deadline}
-                          onChange={e => setForm(p => ({ ...p, deadline: e.target.value }))}
-                          className="bg-transparent text-[#DFE3E9] text-sm font-semibold outline-none w-full"
-                          style={{ colorScheme: 'dark' }} />
-                      </div>
-                      <div className="w-[110px] bg-[#171C20] rounded-xl border border-[#424844]/30 px-3 py-3 flex items-center gap-2">
-                        <input type="time"
-                          value={form.deadlineTime || '23:59'}
-                          onChange={e => setForm(p => ({ ...p, deadlineTime: e.target.value }))}
-                          className="bg-transparent text-[#DFE3E9] text-sm font-semibold outline-none w-full"
-                          style={{ colorScheme: 'dark' }} />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[#8C928D] text-[11px] font-bold uppercase tracking-wider">NHẮC NHỞ</label>
-                    <div className="bg-[#171C20] rounded-xl border border-[#424844]/30 p-4 flex items-center justify-between relative">
-                      <select value={form.remind}
-                        onChange={e => setForm(p => ({ ...p, remind: e.target.value }))}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
-                        {Object.entries(REMIND_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                      </select>
-                      <div className="flex items-center gap-3 pointer-events-none">
-                        <Bell size={20} className="text-[#D8FF7F]" />
-                        <span className="text-[#DFE3E9] text-base">{REMIND_LABELS[form.remind]}</span>
-                      </div>
-                      <ChevronRight size={16} className="text-[#424844] pointer-events-none" />
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[#8C928D] text-[11px] font-bold uppercase tracking-wider">THỜI LƯỢNG DỰ KIẾN</label>
-                    <div className="flex gap-2">
-                      {DURATIONS.map(dur => (
-                        <button key={dur}
-                          onClick={() => setSelectedDuration(dur)}
-                          className={`flex-1 py-3 rounded-xl text-[12px] font-bold transition-all ${
-                            selectedDuration === dur ? 'bg-[#D8FF7F] text-[#4A6400] shadow-md' : 'bg-[#262A2F] text-[#C2C8C2]'
-                          }`}>
-                          {dur}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[#8C928D] text-[11px] font-bold uppercase tracking-wider">GHI CHÚ</label>
-                    <div className="bg-[#171C20] rounded-xl border border-[#424844]/30 px-4 py-3 flex items-start gap-2">
-                      <AlignLeft size={16} className="text-[#8C928D] mt-1 shrink-0" />
-                      <input type="text" value={form.description}
-                        onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
-                        placeholder="Thêm ghi chú..."
-                        className="bg-transparent w-full outline-none text-[#C2C8C2] text-sm" />
-                    </div>
-                  </div>
-                </>
-              )}
+              {error && <p role="alert" className="mt-3 rounded-lg bg-red-500/15 px-3 py-2 text-xs text-red-200">{error}</p>}
             </div>
-          </div>
+
+            <div className="flex gap-3 border-t border-white/10 px-5 py-4">
+              {editingTask && (
+                <button onClick={() => void deleteTask(editingTask)} disabled={saving}
+                  className="rounded-xl border border-red-400/30 px-4 py-3 text-xs font-bold text-red-300 disabled:opacity-50">
+                  Xóa
+                </button>
+              )}
+              <button onClick={() => void saveTask()} disabled={saving}
+                className="flex-1 rounded-xl bg-[#CFFB2B] py-3 text-xs font-extrabold text-[#132417] disabled:opacity-50">
+                {saving ? 'Đang lưu…' : editingTask ? 'Lưu thay đổi' : 'Thêm công việc'}
+              </button>
+            </div>
+          </section>
         </div>
       )}
-
-      {/* Task Detail Modal */}
-      {selectedTask && (
-        <TaskDetailModal
-          task={selectedTask}
-          onClose={() => setSelectedTask(null)}
-        />
-      )}
     </div>
+  );
+}
+
+function TaskCard({
+  task,
+  now,
+  onOpen,
+  onToggle,
+  onDelete,
+}: {
+  task: Task;
+  now: number;
+  onOpen: (task: Task) => void;
+  onToggle: (task: Task) => void;
+  onDelete: (task: Task) => void;
+}) {
+  const complete = task.status === 'completed';
+  const overdue = !complete && !!task.deadline && new Date(task.deadline).getTime() < now;
+  const category = CATEGORY_STYLE[task.category];
+  const priority = task.priority ?? 'none';
+  const checklist = task.subtasks ?? [];
+  const progress = checklist.length ? Math.round(checklist.filter(item => item.completed).length * 100 / checklist.length) : 0;
+  const scheduledDate = dateForTask(task);
+  const deadlineDate = taskDeadlineDate(task);
+  const deadlineDayDiff = deadlineDate && scheduledDate
+    ? Math.round((parseDate(deadlineDate).getTime() - parseDate(scheduledDate).getTime()) / 86_400_000)
+    : 0;
+
+  return (
+    <article className={`relative overflow-hidden rounded-2xl bg-white p-4 shadow-[0_3px_14px_rgba(30,54,35,0.06)] ${complete ? 'opacity-65' : ''}`}>
+      <div className="flex items-start gap-3">
+        <button onClick={() => void onToggle(task)} aria-label={complete ? 'Đánh dấu chưa hoàn thành' : 'Hoàn thành công việc'}
+          className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 ${
+            complete ? 'border-[#32A866] bg-[#32A866] text-white' : 'border-[#D5DED5] text-transparent hover:border-[#4A9D67]'
+          }`}>
+          <Check size={14} strokeWidth={3} />
+        </button>
+
+        <button onClick={() => onOpen(task)} className="min-w-0 flex-1 text-left">
+          <span className={`block truncate text-[15px] font-extrabold ${complete ? 'text-[#7F8B81] line-through' : 'text-[#16291C]'}`}>
+            {task.title}
+          </span>
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <span className="rounded-full px-2 py-1 text-[9px] font-extrabold uppercase"
+              style={{ color: category.color, background: category.background }}>{category.label}</span>
+            {priority !== 'none' && (
+              <span className={`rounded-full px-2 py-1 text-[9px] font-extrabold ${
+                priority === 'high' ? 'bg-red-50 text-red-600' : priority === 'med' ? 'bg-amber-50 text-amber-700' : 'bg-sky-50 text-sky-700'
+              }`}>Ưu tiên {PRIORITY_LABEL[priority].toLowerCase()}</span>
+            )}
+            {overdue && <span className="rounded-full bg-red-50 px-2 py-1 text-[9px] font-extrabold text-red-600">Quá hạn</span>}
+            {task.repeat_type !== 'none' && <span className="inline-flex items-center gap-1 rounded-full bg-[#F0F2EF] px-2 py-1 text-[9px] font-bold text-[#6D796F]">
+              <Repeat2 size={10} /> Lặp lại
+            </span>}
+          </div>
+          {task.description && <p className="mt-2 line-clamp-2 text-xs text-[#758078]">{task.description}</p>}
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-semibold text-[#879189]">
+            {task.start_time ? <span className="inline-flex items-center gap-1"><Clock3 size={11} />{timeLabel(task.start_time)}–{timeLabel(task.end_time)}</span> : <span>Cả ngày</span>}
+            {deadlineDate && <span className={overdue ? 'text-red-600' : ''}>
+              Deadline {deadlineDayDiff === 0 ? 'hôm nay' : deadlineDayDiff > 0 ? `sau ${deadlineDayDiff} ngày` : `trước ${Math.abs(deadlineDayDiff)} ngày`}
+              {' · '}{deadlineRemaining(task.deadline!, now)}
+            </span>}
+            {task.reminder_enabled && <span className="inline-flex items-center gap-1"><Bell size={10} />Nhắc nhở</span>}
+          </div>
+          {checklist.length > 0 && (
+            <div className="mt-3">
+              <div className="mb-1 flex items-center justify-between text-[9px] font-semibold text-[#89948B]">
+                <span>{checklist.filter((item: SubTask) => item.completed).length}/{checklist.length} bước hoàn thành</span><span>{progress}%</span>
+              </div>
+              <div className="h-1 overflow-hidden rounded-full bg-[#EDF0EC]">
+                <div className="h-full rounded-full bg-[#7CB856] transition-all" style={{ width: `${progress}%` }} />
+              </div>
+            </div>
+          )}
+        </button>
+
+        <button onClick={() => void onDelete(task)} aria-label="Xóa công việc"
+          className="shrink-0 rounded-lg p-1.5 text-[#B8C0B9] hover:bg-red-50 hover:text-red-500">
+          <Trash2 size={15} />
+        </button>
+      </div>
+    </article>
   );
 }
