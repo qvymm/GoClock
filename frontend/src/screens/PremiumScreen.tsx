@@ -51,7 +51,7 @@ async function getFunctionErrorMessage(error: any) {
 }
 
 export function PremiumScreen() {
-  const { theme, setScreen, profile, setProfile } = useApp();
+  const { theme, setScreen, user, profile, setProfile } = useApp();
   const [selectedPlan, setSelectedPlan] = useState('yearly');
   const [showPayment, setShowPayment] = useState(false);
   const [transferCode, setTransferCode] = useState('');
@@ -119,7 +119,14 @@ export function PremiumScreen() {
           setTransferCode('');
           setPaymentError('');
           setPaymentStatus('paid');
-          setProfile(profile ? { ...profile, is_premium: true } : profile);
+          if (user) {
+            const { data: refreshedProfile } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', user.id)
+              .maybeSingle();
+            if (active && refreshedProfile) setProfile(refreshedProfile);
+          }
         } else if (result.status === 'expired') {
           setPaymentStatus('expired');
           setSecondsLeft(0);
@@ -131,7 +138,7 @@ export function PremiumScreen() {
     const timer = window.setInterval(() => { void checkOrder(); }, 2500);
     void checkOrder();
     return () => { active = false; window.clearInterval(timer); };
-  }, [showPayment, transferCode, paymentStatus]);
+  }, [showPayment, transferCode, paymentStatus, user, setProfile]);
 
   const countdown = `${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, '0')}`;
 
@@ -154,7 +161,7 @@ export function PremiumScreen() {
             ? { color: '#d9ff70', background: 'rgba(148,212,0,0.16)', border: '1px solid rgba(148,212,0,0.35)' }
             : { color: 'rgba(255,255,255,0.75)', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}>
             {premiumActive
-              ? `ĐANG DÙNG PREMIUM${profile?.premium_until ? ` · đến ${new Date(profile.premium_until).toLocaleDateString('vi-VN')}` : ''}`
+              ? `ĐANG DÙNG PREMIUM · ${profile?.premium_plan === 'monthly' ? 'GÓI THÁNG' : profile?.premium_plan === 'yearly' ? 'GÓI NĂM' : 'ĐANG HOẠT ĐỘNG'}${profile?.premium_until ? ` · đến ${new Date(profile.premium_until).toLocaleDateString('vi-VN')}` : ''}`
               : 'BẠN ĐANG DÙNG GÓI FREE'}
           </div>
         </div>

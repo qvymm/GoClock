@@ -62,6 +62,7 @@ export type Profile = {
   notifications_enabled?: boolean;
   onboarding_completed?: boolean;
   is_premium?: boolean;
+  premium_plan?: 'monthly' | 'yearly' | null;
   premium_until?: string;
   notify_tasks?: boolean;
   notify_meals?: boolean;

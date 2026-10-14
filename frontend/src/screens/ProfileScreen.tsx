@@ -123,7 +123,7 @@ export function ProfileScreen() {
                 ? { color: '#d9ff70', background: 'rgba(148,212,0,0.2)', border: '1px solid rgba(148,212,0,0.45)' }
                 : { color: 'rgba(255,255,255,0.78)', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.16)' }}
             >
-              {premiumActive ? <><Crown size={12} /> PREMIUM{profile?.premium_until ? ` · đến ${new Date(profile.premium_until).toLocaleDateString('vi-VN')}` : ''}</> : 'FREE · GÓI CƠ BẢN'}
+              {premiumActive ? <><Crown size={12} /> PREMIUM · {profile?.premium_plan === 'monthly' ? 'HÀNG THÁNG' : profile?.premium_plan === 'yearly' ? 'HÀNG NĂM' : 'ĐANG HOẠT ĐỘNG'}{profile?.premium_until ? ` · đến ${new Date(profile.premium_until).toLocaleDateString('vi-VN')}` : ''}</> : 'FREE · GÓI CƠ BẢN'}
             </span>
           </div>
         </div>
