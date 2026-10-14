@@ -489,6 +489,23 @@ export default function CalendarScreen() {
           </div>
         ) : (
           <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
+            {dayTasks.some(task => !task.start_time) && (
+              <div className="border-b border-[#EDF0EC] px-3 py-3">
+                <p className="mb-2 text-[9px] font-extrabold uppercase tracking-wider text-[#89948B]">Cả ngày</p>
+                <div className="flex flex-wrap gap-2">
+                  {dayTasks.filter(task => !task.start_time).map(task => {
+                    const style = CATEGORY_STYLE[task.category];
+                    return (
+                      <button key={task.id} onClick={() => openEditTask(task)}
+                        className="max-w-full truncate rounded-lg border-l-[3px] px-2 py-1.5 text-left text-[10px] font-bold"
+                        style={{ background: style.background, borderColor: style.color, color: style.color }}>
+                        {task.title}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             <div className="relative" style={{ height: `${HOURS.length * 56}px` }}>
               {HOURS.map(hour => (
                 <div key={hour} className="absolute left-0 right-0 flex border-t border-[#EDF0EC]"
@@ -514,9 +531,9 @@ export default function CalendarScreen() {
                 );
               })}
             </div>
-            {dayTasks.every(task => !task.start_time) && (
+            {dayTasks.length === 0 && (
               <p className="border-t border-[#EDF0EC] px-4 py-3 text-xs text-[#7F8C81]">
-                Các công việc trong ngày chưa có giờ bắt đầu/kết thúc.
+                Chưa có công việc nào được xếp lịch trong ngày này.
               </p>
             )}
           </div>
