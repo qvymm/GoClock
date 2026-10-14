@@ -260,6 +260,41 @@ export function NutritionScreen() {
       || new Date(a.eaten_at).getTime() - new Date(b.eaten_at).getTime()),
     [meals],
   );
+  const mealRecommendations = useMemo(() => {
+    const gaps = {
+      protein: Math.max(0, (macroGoals.protein - totals.protein) / macroGoals.protein),
+      carbs: Math.max(0, (macroGoals.carbs - totals.carbs) / macroGoals.carbs),
+      fat: Math.max(0, (macroGoals.fat - totals.fat) / macroGoals.fat),
+    };
+    const focus = (Object.entries(gaps) as [keyof typeof gaps, number][])
+      .sort((a, b) => b[1] - a[1])[0];
+    const macroLabels = { protein: 'chất đạm', carbs: 'tinh bột', fat: 'chất béo' };
+    const focusText = focus[1] > 0.05
+      ? `Ưu tiên bổ sung ${macroLabels[focus[0]]}`
+      : 'Gợi ý món cân bằng trong thực đơn';
+    const loggedFoods = new Set(meals.map(meal => {
+      const name = meal.food_name.replace(/ · \d+g$/, '');
+      return normalizeSearch(name);
+    }));
+    const unseenFoods = FOODS.filter(food => !loggedFoods.has(normalizeSearch(food.name)));
+    const candidates = unseenFoods.length > 0 ? unseenFoods : FOODS;
+    const remainingCalories = Math.max(0, calorieGoal - totals.calories);
+    const weights = gaps.protein + gaps.carbs + gaps.fat > 0
+      ? gaps
+      : { protein: 0.2, carbs: 0.2, fat: 0.2 };
+
+    const ranked = candidates.map(food => {
+      const portion = food.portions[food.defaultPortion];
+      const nutrition = calculateFood(food, portion.grams);
+      const nutritionFit = (nutrition.protein / macroGoals.protein) * weights.protein
+        + (nutrition.carbs / macroGoals.carbs) * weights.carbs
+        + (nutrition.fat / macroGoals.fat) * weights.fat;
+      const caloriePenalty = Math.max(0, nutrition.calories - remainingCalories) / calorieGoal;
+      return { food, portion, nutrition, score: nutritionFit - caloriePenalty };
+    }).sort((a, b) => b.score - a.score);
+
+    return { focusText, items: ranked.slice(0, 3) };
+  }, [calorieGoal, macroGoals.carbs, macroGoals.fat, macroGoals.protein, meals, totals]);
   const filteredFoods = useMemo(() => {
     const search = normalizeSearch(query.trim());
     return FOODS.filter(food => !search || normalizeSearch(food.name).includes(search));
@@ -657,6 +692,35 @@ export function NutritionScreen() {
               </button>
             );
           })}
+        </section>
+
+        <section className={styles.recommendations}>
+          <h2 className={styles.sectionTitle}>Món ăn gợi ý</h2>
+          <p className={styles.scheduleHint}>
+            {mealRecommendations.focusText}. Chọn món để xem khẩu phần và thêm vào nhật ký.
+          </p>
+          {mealRecommendations.items.map(({ food, portion, nutrition }) => (
+            <button
+              type="button"
+              className={styles.recommendationRow}
+              key={food.id}
+              onClick={() => openFood(food)}
+              aria-label={`Thêm gợi ý ${food.name}`}
+            >
+              <span className={styles.recommendationEmoji}>{food.emoji}</span>
+              <span className={styles.recommendationDetails}>
+                <strong>{food.name}</strong>
+                <small>{portion.label} · {portion.grams}g</small>
+                <small>
+                  {nutrition.calories} kcal · Đạm {round(nutrition.protein)}g · Tinh bột {round(nutrition.carbs)}g · Béo {round(nutrition.fat)}g
+                </small>
+              </span>
+              <span className={styles.recommendationAdd}><Plus size={17} /></span>
+            </button>
+          ))}
+          <p className={styles.recommendationDisclaimer}>
+            Ước tính tham khảo từ danh sách món ăn mẫu; nhu cầu thực tế có thể khác nhau.
+          </p>
         </section>
       </main>
 
