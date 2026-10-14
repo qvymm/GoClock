@@ -38,6 +38,18 @@ async function readApiResponse(response: Response) {
   }
 }
 
+async function getFunctionErrorMessage(error: any) {
+  if (error?.context instanceof Response) {
+    try {
+      const body = await readApiResponse(error.context);
+      return body.error || body.message || error.message || 'Không gọi được Edge Function.';
+    } catch (responseError) {
+      if (responseError instanceof Error) return responseError.message;
+    }
+  }
+  return error?.message || 'Không gọi được Edge Function.';
+}
+
 export function PremiumScreen() {
   const { theme, setScreen, profile, setProfile } = useApp();
   const [selectedPlan, setSelectedPlan] = useState('yearly');
@@ -61,13 +73,11 @@ export function PremiumScreen() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error('Vui lòng đăng nhập lại để thanh toán.');
-      const response = await fetch('/api/create-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ plan: selectedPlan }),
+      const { data: result, error } = await supabase.functions.invoke('create-order', {
+        body: { plan: selectedPlan },
       });
-      const result = await readApiResponse(response);
-      if (!response.ok) throw new Error(result.error || 'Không tạo được đơn thanh toán.');
+      if (error) throw new Error(await getFunctionErrorMessage(error));
+      if (!result?.code || !result?.expiresAt) throw new Error('Edge Function không trả đủ thông tin đơn thanh toán.');
       setTransferCode(result.code);
       setPaymentAmount(Number(result.amount));
       setExpiresAt(new Date(result.expiresAt).getTime());
@@ -98,12 +108,13 @@ export function PremiumScreen() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session?.access_token) return;
-        const response = await fetch(`/api/order-status?code=${encodeURIComponent(transferCode)}`, {
-          headers: { Authorization: `Bearer ${session.access_token}` },
+        const { data: result, error } = await supabase.functions.invoke('order-status', {
+          body: { code: transferCode },
         });
-        const result = await readApiResponse(response);
-        if (!response.ok || !active) return;
+        if (error || !active || !result) return;
         if (result.status === 'paid') {
+          setTransferCode('');
+          setPaymentError('');
           setPaymentStatus('paid');
           setProfile(profile ? { ...profile, is_premium: true } : profile);
         } else if (result.status === 'expired') {
@@ -228,8 +239,11 @@ export function PremiumScreen() {
               <p className="py-8 text-center text-sm text-gray-400">Đang tạo đơn thanh toán…</p>
             ) : paymentStatus === 'paid' ? (
               <div className="py-8 text-center">
+                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[#94d400]/15">
+                  <Check size={28} className="text-[#94d400]" />
+                </div>
                 <p className="text-2xl font-bold text-[#94d400]">Thanh toán thành công</p>
-                <p className="mt-2 text-sm text-gray-400">Gói Premium đã được kích hoạt.</p>
+                <p className="mt-2 text-sm text-gray-400">Bạn đã mua gói {selectedPlanDetails.name}. Premium đã được kích hoạt.</p>
               </div>
             ) : expired ? (
               <div className="py-5 text-center">

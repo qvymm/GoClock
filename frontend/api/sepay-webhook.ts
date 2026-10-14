@@ -11,11 +11,16 @@ export default async function handler(req: any, res: any) {
 
   const expectedAccount = (process.env.VITE_PREMIUM_BANK_ACCOUNT ?? '').replace(/\s/g, '');
   const receivedAccount = String(payload.accountNumber ?? '').replace(/\s/g, '');
-  if (!expectedAccount || receivedAccount !== expectedAccount) {
+  const receivedSubAccount = String(payload.subAccount ?? '').replace(/\s/g, '');
+  const matchedAccount = [receivedAccount, receivedSubAccount].find(account => account && account === expectedAccount);
+  if (!expectedAccount || !matchedAccount) {
     return sendJson(res, 200, { success: true });
   }
 
-  const code = String(payload.code ?? payload.content?.match(/\bGC\d{8}\b/i)?.[0] ?? '').toUpperCase();
+  const transferCode = [payload.code, payload.content, payload.description]
+    .map(value => String(value ?? '').match(/\bGC\d{8}\b/i)?.[0])
+    .find(Boolean);
+  const code = String(transferCode ?? '').toUpperCase();
   const amount = Number(payload.transferAmount);
   const transactionId = String(payload.id ?? payload.referenceCode ?? '');
   if (!/^GC\d{8}$/.test(code) || !Number.isInteger(amount) || !transactionId) {
@@ -28,7 +33,7 @@ export default async function handler(req: any, res: any) {
       p_code: code,
       p_amount: amount,
       p_transaction_id: transactionId,
-      p_account_number: receivedAccount,
+      p_account_number: matchedAccount,
     });
     if (error) throw error;
     // Ignore unmatched, wrong-amount, duplicate, or expired orders. They cannot activate Premium.
