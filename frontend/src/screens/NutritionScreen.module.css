@@ -815,6 +815,46 @@
   font-size: 10px;
 }
 
+.photoBusy {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 18px 10px 24px;
+  color: #d5e8db;
+  text-align: center;
+}
+
+.photoBusy img {
+  width: min(100%, 210px);
+  height: 210px;
+  border: 1px solid #2a5a3d;
+  border-radius: 18px;
+  object-fit: cover;
+}
+
+.photoBusy strong {
+  font-size: 14px;
+}
+
+.photoBusy small {
+  color: #a9c7b4;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid #2a5a3d;
+  border-top-color: var(--lime);
+  border-radius: 50%;
+  animation: nutrition-spin 0.8s linear infinite;
+}
+
+@keyframes nutrition-spin {
+  to { transform: rotate(360deg); }
+}
+
 .dishHeading {
   display: flex;
   align-items: center;

@@ -21,7 +21,7 @@ import styles from './NutritionScreen.module.css';
 
 type MealType = Meal['meal_type'];
 type MealKey = 'breakfast' | 'lunch' | 'snack' | 'dinner';
-type SheetView = 'menu' | 'search' | 'confirm' | 'remind';
+type SheetView = 'menu' | 'search' | 'busy' | 'confirm' | 'remind';
 type MacroValues = { calories: string; protein: string; carbs: string; fat: string };
 type Portion = { label: string; grams: number };
 type Food = {
@@ -343,6 +343,7 @@ export function NutritionScreen() {
     function handleEscape(event: KeyboardEvent) {
       if (event.key !== 'Escape' || loading) return;
       if (photoTimer.current) clearTimeout(photoTimer.current);
+      photoTimer.current = null;
       if (imagePreview) URL.revokeObjectURL(imagePreview);
       setImagePreview(null);
       setSheetView(null);
@@ -370,6 +371,7 @@ export function NutritionScreen() {
   function closeSheet() {
     if (loading) return;
     if (photoTimer.current) clearTimeout(photoTimer.current);
+    photoTimer.current = null;
     clearPreview();
     setSheetView(null);
     setDraft(null);
@@ -408,6 +410,15 @@ export function NutritionScreen() {
   }
 
   function handleBack() {
+    if (sheetView === 'busy' || (sheetView === 'confirm' && draft?.source === 'photo')) {
+      if (photoTimer.current) clearTimeout(photoTimer.current);
+      photoTimer.current = null;
+      clearPreview();
+      setSheetView('menu');
+      setDraft(null);
+      setError('');
+      return;
+    }
     if (sheetView === 'confirm' && draft?.source === 'manual') {
       setSheetView('search');
       return;
@@ -422,11 +433,30 @@ export function NutritionScreen() {
     clearPreview();
     const preview = URL.createObjectURL(file);
     setImagePreview(preview);
-    const next = initialDraft(null, 'photo');
-    next.imagePreview = preview;
-    setDraft(next);
-    setSheetView('confirm');
+    const candidates = [0, 3, 7].map(offset => FOODS[(file.size + offset) % FOODS.length]);
+    setDraft(null);
+    setSheetView('busy');
     setError('');
+    photoTimer.current = setTimeout(() => {
+      const food = candidates[0];
+      setDraft({
+        ...initialDraft(food, 'photo'),
+        imagePreview: preview,
+        candidates,
+      });
+      setSheetView(current => current === 'busy' ? 'confirm' : current);
+      photoTimer.current = null;
+    }, 1500);
+  }
+
+  function selectPhotoCandidate(food: Food) {
+    setDraft(current => current ? {
+      ...current,
+      food,
+      custom: false,
+      name: food.name,
+      grams: food.portions[food.defaultPortion].grams,
+    } : current);
   }
 
   function editReminder(meal: MealKey) {
@@ -730,7 +760,7 @@ export function NutritionScreen() {
             className={`${styles.sheet} ${sheetView === 'remind' ? styles.reminderSheet : ''}`}
             role="dialog"
             aria-modal="true"
-            aria-label={sheetView === 'remind' ? 'Thiết lập lời nhắc' : 'Thêm bữa ăn'}
+            aria-label={sheetView === 'remind' ? 'Thiết lập lời nhắc' : sheetView === 'busy' ? 'Đang nhận diện món ăn' : 'Thêm bữa ăn'}
             onClick={event => event.stopPropagation()}
           >
             <div className={styles.grab} />
@@ -743,6 +773,7 @@ export function NutritionScreen() {
               <h2>
                 {sheetView === 'menu' && 'Thêm bữa ăn'}
                 {sheetView === 'search' && 'Tìm món ăn'}
+                {sheetView === 'busy' && 'Đang nhận diện món ăn'}
                 {sheetView === 'confirm' && (draft?.editId ? 'Sửa bữa ăn' : 'Xác nhận món ăn')}
                 {sheetView === 'remind' && `Lời nhắc ${reminderDraft ? MEAL_NAMES[reminderDraft.meal] : ''}`}
               </h2>
@@ -756,12 +787,12 @@ export function NutritionScreen() {
                 <p className={styles.lead}>Chọn cách ghi nhận bữa ăn:</p>
                 <button type="button" className={`${styles.methodCard} ${styles.methodPhoto}`} onClick={() => cameraInput.current?.click()}>
                   <span><Camera size={25} /></span>
-                  <i><strong>Chụp ảnh</strong><small>Chọn ảnh món ăn để nhập thông tin</small></i>
+                  <i><strong>Chụp ảnh</strong><small>Mô phỏng nhận diện món và khẩu phần; hãy kiểm tra trước khi lưu.</small></i>
                   <ChevronRight size={18} />
                 </button>
                 <button type="button" className={`${styles.methodCard} ${styles.methodLibrary}`} onClick={() => libraryInput.current?.click()}>
                   <span><ImageIcon size={25} /></span>
-                  <i><strong>Thư viện ảnh</strong><small>Chọn ảnh từ thiết bị</small></i>
+                  <i><strong>Thư viện ảnh</strong><small>Chọn ảnh để xem gợi ý món ăn mô phỏng.</small></i>
                   <ChevronRight size={18} />
                 </button>
                 <button type="button" className={`${styles.methodCard} ${styles.methodManual}`} onClick={() => { setQuery(''); setSheetView('search'); }}>
@@ -769,7 +800,18 @@ export function NutritionScreen() {
                   <i><strong>Nhập tay</strong><small>Tìm món có sẵn hoặc tự nhập dinh dưỡng</small></i>
                   <ChevronRight size={18} />
                 </button>
-                <p className={styles.photoNote}>Nhận diện món ăn tự động chưa được tích hợp; ảnh chỉ dùng để tham khảo khi nhập món.</p>
+                <p className={styles.photoNote}>Luồng nhận diện hiện là mô phỏng theo mockup, chưa phân tích ảnh bằng AI thật.</p>
+              </div>
+            )}
+
+            {sheetView === 'busy' && (
+              <div className={styles.sheetBody}>
+                <div className={styles.photoBusy}>
+                  {imagePreview && <img src={imagePreview} alt="Ảnh món ăn đang được xử lý" />}
+                  <span className={styles.spinner} aria-hidden="true" />
+                  <strong>Đang nhận diện món ăn…</strong>
+                  <small>Đây là bước mô phỏng giao diện; kết quả cần được kiểm tra lại.</small>
+                </div>
               </div>
             )}
 
@@ -813,13 +855,28 @@ export function NutritionScreen() {
               <>
                 <div className={styles.sheetBody}>
                   {draft.source === 'photo' && (
-                    <div className={styles.photoWarning}>
-                      {draft.imagePreview && <img src={draft.imagePreview} alt="Ảnh món ăn đã chọn" />}
-                      <span>
-                        <strong>Ảnh đã được chọn</strong>
-                        <small>Ứng dụng chưa có nhận diện ảnh tự động. Hãy chọn món hoặc nhập thông tin thủ công để lưu chính xác.</small>
-                      </span>
-                    </div>
+                    <>
+                      <div className={styles.photoWarning}>
+                        {draft.imagePreview && <img src={draft.imagePreview} alt="Ảnh món ăn đã chọn" />}
+                        <span>
+                          <strong>Gợi ý nhận diện mô phỏng</strong>
+                          <small>Chọn món gần đúng nhất; kết quả chưa được phân tích bằng AI thật.</small>
+                        </span>
+                      </div>
+                      <p className={styles.fieldLabel}>Không đúng món? Chọn gợi ý khác</p>
+                      <div className={styles.chips}>
+                        {draft.candidates.map(food => (
+                          <button
+                            type="button"
+                            key={food.id}
+                            aria-pressed={draft.food?.id === food.id}
+                            onClick={() => selectPhotoCandidate(food)}
+                          >
+                            {food.name}
+                          </button>
+                        ))}
+                      </div>
+                    </>
                   )}
 
                   {draft.custom ? (
