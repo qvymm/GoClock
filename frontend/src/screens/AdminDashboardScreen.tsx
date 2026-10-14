@@ -241,7 +241,6 @@ export function AdminDashboardScreen() {
                         </LineChart>
                       </ResponsiveContainer>
                     </div>
-                  </div>
                   </ChartCard>
 
                   <ChartCard title="Revenue Trend" description="Jan - Jun" icon={CreditCard}>
@@ -287,7 +286,7 @@ export function AdminDashboardScreen() {
                       ))}
                     </div>
                   </div>
-                  </ChartCard>
+                </ChartCard>
                 </div>
               </div>
             </section>
