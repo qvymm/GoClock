@@ -14,7 +14,6 @@ SET search_path = public
 AS $$
 DECLARE
   payment_order public.premium_orders%ROWTYPE;
-  plan_days INTEGER;
 BEGIN
   IF EXISTS (
     SELECT 1 FROM public.premium_orders
@@ -41,11 +40,13 @@ BEGIN
   SET status = 'paid', paid_at = now(), sepay_transaction_id = p_transaction_id
   WHERE id = payment_order.id;
 
-  plan_days := CASE payment_order.plan WHEN 'monthly' THEN 30 ELSE 365 END;
   UPDATE public.profiles
   SET is_premium = true,
       premium_plan = payment_order.plan,
-      premium_until = GREATEST(COALESCE(premium_until, now()), now()) + make_interval(days => plan_days),
+      premium_until = CASE payment_order.plan
+        WHEN 'monthly' THEN now() + interval '1 month'
+        ELSE now() + interval '1 year'
+      END,
       updated_at = now()
   WHERE id = payment_order.user_id;
 

@@ -161,7 +161,7 @@ export function PremiumScreen() {
             ? { color: '#d9ff70', background: 'rgba(148,212,0,0.16)', border: '1px solid rgba(148,212,0,0.35)' }
             : { color: 'rgba(255,255,255,0.75)', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}>
             {premiumActive
-              ? `ĐANG DÙNG PREMIUM · ${profile?.premium_plan === 'monthly' ? 'GÓI THÁNG' : profile?.premium_plan === 'yearly' ? 'GÓI NĂM' : 'ĐANG HOẠT ĐỘNG'}${profile?.premium_until ? ` · đến ${new Date(profile.premium_until).toLocaleDateString('vi-VN')}` : ''}`
+              ? `PREMIUM${profile?.premium_until ? ` · ${new Date(profile.premium_until).toLocaleDateString('vi-VN')}` : ''}`
               : 'BẠN ĐANG DÙNG GÓI FREE'}
           </div>
         </div>
