@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { User, ChevronRight, Bell, Clock, Scale, LogOut, Edit2, Check, Settings, HelpCircle, BookOpen, Crown } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { isPremiumActive, supabase } from '../lib/supabase';
 import { useApp } from '../lib/AppContext';
 
 export function ProfileScreen() {
@@ -50,6 +50,7 @@ export function ProfileScreen() {
 
   const bmiInfo = getBmiInfo(bmi);
   const tdee = calcTDEE();
+  const premiumActive = isPremiumActive(profile);
 
   async function saveProfile() {
     setSaving(true);
@@ -80,7 +81,7 @@ export function ProfileScreen() {
     { icon: Settings, label: 'Cài đặt', screen: 'settings', color: '#1967d2' },
     { icon: HelpCircle, label: 'Trợ giúp', screen: 'help', color: '#137333' },
     { icon: BookOpen, label: 'Hướng dẫn', screen: 'guide', color: '#b06000' },
-    { icon: Crown, label: 'Gói Premium', screen: 'premium', color: '#e65100', badge: profile?.is_premium ? 'PREMIUM' : 'FREE' },
+    { icon: Crown, label: 'Gói Premium', screen: 'premium', color: '#e65100', badge: premiumActive ? 'PREMIUM' : 'FREE' },
   ];
 
   return (
@@ -116,6 +117,14 @@ export function ProfileScreen() {
             <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.5)' }}>
               {user?.email || 'Tài khoản GõClock'}
             </p>
+            <span
+              className="mt-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold"
+              style={premiumActive
+                ? { color: '#d9ff70', background: 'rgba(148,212,0,0.2)', border: '1px solid rgba(148,212,0,0.45)' }
+                : { color: 'rgba(255,255,255,0.78)', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.16)' }}
+            >
+              {premiumActive ? <><Crown size={12} /> PREMIUM{profile?.premium_until ? ` · ${new Date(profile.premium_until).toLocaleDateString('vi-VN')}` : ''}</> : 'FREE · GÓI CƠ BẢN'}
+            </span>
           </div>
         </div>
       </div>

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useApp } from '../lib/AppContext';
-import { supabase } from '../lib/supabase';
+import { isPremiumActive, supabase } from '../lib/supabase';
 import { ArrowLeft, Check, Crown, Zap, Star, Shield } from 'lucide-react';
 
 const features = [
@@ -38,8 +38,20 @@ async function readApiResponse(response: Response) {
   }
 }
 
+async function getFunctionErrorMessage(error: any) {
+  if (error?.context instanceof Response) {
+    try {
+      const body = await readApiResponse(error.context);
+      return body.error || body.message || error.message || 'Không gọi được Edge Function.';
+    } catch (responseError) {
+      if (responseError instanceof Error) return responseError.message;
+    }
+  }
+  return error?.message || 'Không gọi được Edge Function.';
+}
+
 export function PremiumScreen() {
-  const { theme, setScreen, profile, setProfile } = useApp();
+  const { theme, setScreen, user, profile, setProfile } = useApp();
   const [selectedPlan, setSelectedPlan] = useState('yearly');
   const [showPayment, setShowPayment] = useState(false);
   const [transferCode, setTransferCode] = useState('');
@@ -48,6 +60,7 @@ export function PremiumScreen() {
   const [paymentAmount, setPaymentAmount] = useState(0);
   const [paymentStatus, setPaymentStatus] = useState<'creating' | 'pending' | 'paid' | 'expired' | 'error'>('creating');
   const [paymentError, setPaymentError] = useState('');
+  const premiumActive = isPremiumActive(profile);
   const expired = paymentStatus === 'expired' || secondsLeft <= 0;
   const selectedPlanDetails = plans.find(plan => plan.id === selectedPlan) ?? plans[1];
   const qrUrl = paymentStatus === 'pending' && transferCode && bank.account && bank.code
@@ -61,16 +74,15 @@ export function PremiumScreen() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error('Vui lòng đăng nhập lại để thanh toán.');
-      const response = await fetch('/api/create-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ plan: selectedPlan }),
+      const { data: result, error } = await supabase.functions.invoke('create-order', {
+        body: { plan: selectedPlan },
       });
-      const result = await readApiResponse(response);
-      if (!response.ok) throw new Error(result.error || 'Không tạo được đơn thanh toán.');
+      if (error) throw new Error(await getFunctionErrorMessage(error));
+      const orderExpiresAt = result?.expiresAt ?? result?.expires_at;
+      if (!result?.code || !orderExpiresAt) throw new Error('Edge Function không trả đủ thông tin đơn thanh toán.');
       setTransferCode(result.code);
       setPaymentAmount(Number(result.amount));
-      setExpiresAt(new Date(result.expiresAt).getTime());
+      setExpiresAt(new Date(orderExpiresAt).getTime());
       setSecondsLeft(180);
       setPaymentStatus('pending');
     } catch (error) {
@@ -98,14 +110,23 @@ export function PremiumScreen() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session?.access_token) return;
-        const response = await fetch(`/api/order-status?code=${encodeURIComponent(transferCode)}`, {
-          headers: { Authorization: `Bearer ${session.access_token}` },
-        });
-        const result = await readApiResponse(response);
-        if (!response.ok || !active) return;
+        const { data: result, error } = await supabase.functions.invoke(
+          `order-status?code=${encodeURIComponent(transferCode)}`,
+          { method: 'GET' },
+        );
+        if (error || !active || !result) return;
         if (result.status === 'paid') {
+          setTransferCode('');
+          setPaymentError('');
           setPaymentStatus('paid');
-          setProfile(profile ? { ...profile, is_premium: true } : profile);
+          if (user) {
+            const { data: refreshedProfile } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', user.id)
+              .maybeSingle();
+            if (active && refreshedProfile) setProfile(refreshedProfile);
+          }
         } else if (result.status === 'expired') {
           setPaymentStatus('expired');
           setSecondsLeft(0);
@@ -117,7 +138,7 @@ export function PremiumScreen() {
     const timer = window.setInterval(() => { void checkOrder(); }, 2500);
     void checkOrder();
     return () => { active = false; window.clearInterval(timer); };
-  }, [showPayment, transferCode, paymentStatus]);
+  }, [showPayment, transferCode, paymentStatus, user, setProfile]);
 
   const countdown = `${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, '0')}`;
 
@@ -136,6 +157,13 @@ export function PremiumScreen() {
             <Crown size={32} style={{ color: '#0d1f12' }} />
           </div>
           <p className="text-sm text-center" style={{ color: 'rgba(255,255,255,0.6)' }}>Mở khóa toàn bộ tính năng cao cấp</p>
+          <div className="mt-4 rounded-full px-4 py-2 text-xs font-semibold" style={premiumActive
+            ? { color: '#d9ff70', background: 'rgba(148,212,0,0.16)', border: '1px solid rgba(148,212,0,0.35)' }
+            : { color: 'rgba(255,255,255,0.75)', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}>
+            {premiumActive
+              ? `PREMIUM${profile?.premium_until ? ` · ${new Date(profile.premium_until).toLocaleDateString('vi-VN')}` : ''}`
+              : 'BẠN ĐANG DÙNG GÓI FREE'}
+          </div>
         </div>
       </div>
 
@@ -227,9 +255,19 @@ export function PremiumScreen() {
             {paymentStatus === 'creating' ? (
               <p className="py-8 text-center text-sm text-gray-400">Đang tạo đơn thanh toán…</p>
             ) : paymentStatus === 'paid' ? (
-              <div className="py-8 text-center">
+              <div className="py-6 text-center" role="status" aria-live="polite">
+                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[#94d400]/15">
+                  <Check size={28} className="text-[#94d400]" />
+                </div>
                 <p className="text-2xl font-bold text-[#94d400]">Thanh toán thành công</p>
-                <p className="mt-2 text-sm text-gray-400">Gói Premium đã được kích hoạt.</p>
+                <p className="mt-2 text-sm text-gray-400">Bạn đã mua gói {selectedPlanDetails.name}. Premium đã được kích hoạt.</p>
+                <button
+                  onClick={() => setShowPayment(false)}
+                  className="mt-6 w-full rounded-2xl py-3.5 font-semibold text-[#0d1f12]"
+                  style={{ background: 'linear-gradient(135deg, #94d400 0%, #72a800 100%)' }}
+                >
+                  Hoàn tất
+                </button>
               </div>
             ) : expired ? (
               <div className="py-5 text-center">

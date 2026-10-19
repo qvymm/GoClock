@@ -1,0 +1,2 @@
+[functions.sepay-webhook]
+verify_jwt = false

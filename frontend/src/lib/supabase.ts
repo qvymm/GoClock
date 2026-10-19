@@ -62,6 +62,7 @@ export type Profile = {
   notifications_enabled?: boolean;
   onboarding_completed?: boolean;
   is_premium?: boolean;
+  premium_plan?: 'monthly' | 'yearly' | null;
   premium_until?: string;
   notify_tasks?: boolean;
   notify_meals?: boolean;
@@ -70,6 +71,14 @@ export type Profile = {
   meal_lunch?: string;
   meal_dinner?: string;
 };
+
+/** Premium is active until its recorded expiry. A null expiry supports legacy/admin grants. */
+export function isPremiumActive(profile: Profile | null | undefined, now = Date.now()): boolean {
+  if (!profile?.is_premium) return false;
+  if (!profile.premium_until) return true;
+  const expiresAt = Date.parse(profile.premium_until);
+  return Number.isFinite(expiresAt) && expiresAt > now;
+}
 
 export type Task = {
   id: string;
