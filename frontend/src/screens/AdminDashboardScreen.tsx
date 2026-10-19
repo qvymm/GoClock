@@ -146,6 +146,8 @@ export function AdminDashboardScreen() {
   const [landingVisits, setLandingVisits] = useState(0);
   const [loadingLandingStats, setLoadingLandingStats] = useState(false);
   const [landingStatsError, setLandingStatsError] = useState('');
+  const [ratingSummary, setRatingSummary] = useState({ count: 0, average: 0, distribution: {} as Record<string, number> });
+  const [ratingSummaryError, setRatingSummaryError] = useState('');
 
   useEffect(() => {
     if (activeSection !== 'analytics') return;
@@ -168,6 +170,31 @@ export function AdminDashboardScreen() {
       setLoadingLandingStats(false);
     }
     void fetchLandingStats();
+    return () => { current = false; };
+  }, [activeSection]);
+
+  useEffect(() => {
+    if (activeSection !== 'analytics') return;
+    let current = true;
+    async function fetchRatingSummary() {
+      setRatingSummaryError('');
+      const { data, error } = await supabase.rpc('get_admin_app_rating_summary');
+      if (!current) return;
+      if (error) {
+        console.error('Unable to load app rating summary:', error);
+        setRatingSummaryError('ChÆ°a táº£i Ä‘Æ°á»£c Ä‘Ã¡nh giÃ¡. HÃ£y cháº¡y migration Ä‘Ã¡nh giÃ¡ á»©ng dá»¥ng trÃªn Supabase.');
+        return;
+      }
+      if (data && typeof data === 'object') {
+        const result = data as { count?: number; average?: number; distribution?: Record<string, number> };
+        setRatingSummary({
+          count: Number(result.count) || 0,
+          average: Number(result.average) || 0,
+          distribution: result.distribution ?? {},
+        });
+      }
+    }
+    void fetchRatingSummary();
     return () => { current = false; };
   }, [activeSection]);
 
@@ -643,6 +670,36 @@ export function AdminDashboardScreen() {
                     })}
                   </div>
                 )}
+              </div>
+              <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+                <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+                  <div className="sm:min-w-52">
+                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-600">Pháº£n há»“i ngÆ°á»i dÃ¹ng</p>
+                    <h3 className="mt-2 text-xl font-semibold text-slate-900">ÄÃ¡nh giÃ¡ á»©ng dá»¥ng</h3>
+                    <p className="mt-1 text-sm text-slate-500">Tá»•ng há»£p Ä‘Ã¡nh giÃ¡ tá»« mÃ n Trá»£ giÃºp</p>
+                  </div>
+                  <div className="flex items-center gap-3 rounded-2xl bg-amber-50 px-5 py-3">
+                    <Star size={28} fill="#f5b301" color="#f5b301" />
+                    <div>
+                      <p className="text-2xl font-bold text-slate-900">{ratingSummary.average.toFixed(1)} <span className="text-sm font-medium text-slate-500">/ 5</span></p>
+                      <p className="text-xs text-slate-600">{ratingSummary.count.toLocaleString('vi-VN')} lượt đánh giá</p>
+                    </div>
+                  </div>
+                  <div className="grid flex-1 gap-2">
+                    {[5, 4, 3, 2, 1].map(stars => {
+                      const count = Number(ratingSummary.distribution[String(stars)]) || 0;
+                      const percentage = ratingSummary.count ? Math.round(count * 100 / ratingSummary.count) : 0;
+                      return <div key={stars} className="flex items-center gap-2 text-xs text-slate-500">
+                        <span className="w-8 shrink-0">{stars} sao</span>
+                        <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
+                          <div className="h-full rounded-full bg-amber-400" style={{ width: `${percentage}%` }} />
+                        </div>
+                        <span className="w-8 text-right">{count}</span>
+                      </div>;
+                    })}
+                  </div>
+                </div>
+                {ratingSummaryError && <p role="alert" className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">{ratingSummaryError}</p>}
               </div>
               <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
