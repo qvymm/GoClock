@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Moon, Sun, CheckCircle2, Info, Bell, BellOff, Volume2, Save, X, Plus, Trash2, Edit2, ChevronLeft } from 'lucide-react';
-import { supabase } from '../lib/supabase';
 import { useApp } from '../lib/AppContext';
+import { localDateKey } from '../lib/taskDates';
+import { getSleepBedtimeCheckIn, saveConfirmedSleepLog, saveSleepBedtimeCheckIn, sleepBedtimeDateKeyForWake } from '../lib/sleepCheckIns';
 
 const DAYS_OF_WEEK = [
   { id: 1, label: 'T2' },
@@ -42,8 +43,13 @@ export function SleepScreen() {
   
   // Modals & Alerts
   const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [activeAlert, setActiveAlert] = useState<{type: 'remind30' | 'bedtime' | 'waketime', message: string} | null>(null);
+  const [activeAlert, setActiveAlert] = useState<{
+    type: 'remind30' | 'bedtime' | 'waketime';
+    message: string;
+    schedule: SleepSchedule;
+  } | null>(null);
   const [checkingIn, setCheckingIn] = useState(false);
+  const [checkInError, setCheckInError] = useState('');
   const [audio] = useState(new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'));
 
   // Load schedules on mount
@@ -85,13 +91,13 @@ export function SleepScreen() {
 
         if (schedule.remind30Min && currentHM === remindHM && !sessionStorage.getItem(`notified_r30_${schedule.id}_${currentHM}`)) {
           sessionStorage.setItem(`notified_r30_${schedule.id}_${currentHM}`, 'true');
-          setActiveAlert({ type: 'remind30', message: 'Sắp đến giờ ngủ rồi! (Còn 30 phút). Hãy chuẩn bị nhé 🌙' });
+          setActiveAlert({ type: 'remind30', message: 'Sắp đến giờ ngủ rồi! (Còn 30 phút). Hãy chuẩn bị nhé 🌙', schedule });
         }
 
         // Remind at bedtime
         if (schedule.remind30Min && currentHM === schedule.bedTime && !sessionStorage.getItem(`notified_bed_${schedule.id}_${currentHM}`)) {
           sessionStorage.setItem(`notified_bed_${schedule.id}_${currentHM}`, 'true');
-          setActiveAlert({ type: 'bedtime', message: 'Đã đến giờ đi ngủ, hãy tắt máy và nghỉ ngơi ngay thôi! 💤' });
+          setActiveAlert({ type: 'bedtime', message: 'Đã đến giờ đi ngủ, hãy tắt máy và nghỉ ngơi ngay thôi! 💤', schedule });
         }
 
         // Alarm at wake time
@@ -99,7 +105,7 @@ export function SleepScreen() {
           sessionStorage.setItem(`notified_wake_${schedule.id}_${currentHM}`, 'true');
           audio.loop = true;
           audio.play().catch(e => console.log('Audio blocked', e));
-          setActiveAlert({ type: 'waketime', message: 'Đã đến giờ thức dậy! Chào buổi sáng! ☀️' });
+          setActiveAlert({ type: 'waketime', message: 'Đã đến giờ thức dậy! Chào buổi sáng! ☀️', schedule });
         }
       }
     }, 10000); // Check every 10s
@@ -169,27 +175,51 @@ export function SleepScreen() {
 
   const handleMorningCheckIn = async () => {
     setCheckingIn(true);
+    setCheckInError('');
     audio.pause();
     audio.currentTime = 0;
 
     if (user) {
       const now = new Date();
-      const actualWakeTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-      const today = now.toISOString().split('T')[0];
-      
-      // Update actual sleep record for today
-      // Assuming the user slept the expected duration since we don't have a specific check-out.
-      // This gives them credit for the check-in.
-      await supabase.from('sleep_logs').upsert({
-        user_id: user.id,
-        log_date: today,
-        wake_time: actualWakeTime,
-        quality: 'good',
-        cycles: 5
-      }, { onConflict: 'user_id,log_date' });
-      
-      alert('Tuyệt vời! Bạn đã hoàn thành mục tiêu giấc ngủ.\n⚡ Năng lượng hôm nay được +10 điểm!');
+      const schedule = activeAlert?.schedule;
+      const bedtimeDateKey = schedule
+        ? sleepBedtimeDateKeyForWake(now, schedule.bedTime, schedule.wakeTime)
+        : '';
+      let bedtime: Date | null = null;
+      try {
+        if (schedule && bedtimeDateKey) {
+          bedtime = getSleepBedtimeCheckIn(user.id, schedule.id, bedtimeDateKey);
+        }
+      } catch (error) {
+        console.error('Unable to read bedtime confirmation:', error);
+        setCheckInError('Không thể đọc giờ đi ngủ đã xác nhận trên thiết bị.');
+        setCheckingIn(false);
+        return;
+      }
+      const durationMinutes = bedtime
+        ? Math.round((now.getTime() - bedtime.getTime()) / 60_000)
+        : null;
+      const validDuration = durationMinutes != null && durationMinutes > 0 && durationMinutes <= 24 * 60
+        ? durationMinutes
+        : null;
+      const { error } = await saveConfirmedSleepLog(user.id, localDateKey(now), {
+        bedtime: validDuration ? bedtime!.toISOString() : null,
+        wake_time: now.toISOString(),
+        duration_minutes: validDuration,
+        cycles: validDuration ? Math.max(1, Math.round(validDuration / 90)) : 5,
+        target_bedtime: schedule?.bedTime ?? null,
+        target_wake_time: schedule?.wakeTime ?? null,
+      });
+      if (error) {
+        console.error('Unable to save wake confirmation:', error);
+        setCheckInError('Không thể lưu xác nhận thức dậy. Vui lòng thử lại.');
+        setCheckingIn(false);
+        return;
+      }
       await refreshSleep();
+      alert(validDuration
+        ? `Đã ghi nhận ${Math.floor(validDuration / 60)} giờ ${validDuration % 60} phút ngủ.`
+        : 'Đã ghi nhận giờ thức dậy. Hãy xác nhận giờ đi ngủ để tính thời lượng.');
     }
     setCheckingIn(false);
     setActiveAlert(null);
@@ -239,11 +269,25 @@ export function SleepScreen() {
                   {checkingIn ? 'Đang xác nhận...' : 'Chào buổi sáng! Tôi đã dậy đúng giờ ☀️'}
                 </button>
               ) : (
-                <button onClick={() => {audio.pause(); setActiveAlert(null);}}
+                <button onClick={() => {
+                  if (activeAlert.type === 'bedtime' && user) {
+                    try {
+                      saveSleepBedtimeCheckIn(user.id, activeAlert.schedule.id, new Date());
+                      setCheckInError('');
+                    } catch (error) {
+                      console.error('Unable to save bedtime confirmation:', error);
+                      setCheckInError('Không thể lưu giờ đi ngủ trên thiết bị.');
+                      return;
+                    }
+                  }
+                  audio.pause();
+                  setActiveAlert(null);
+                }}
                   className="w-full mt-2 py-3 rounded-xl font-bold text-blue-600 bg-white shadow-md active:scale-95">
-                  Đã hiểu
+                  {activeAlert.type === 'bedtime' ? 'Xác nhận đi ngủ' : 'Đã hiểu'}
                 </button>
               )}
+              {checkInError && <p role="alert" className="text-sm font-semibold text-red-100">{checkInError}</p>}
             </div>
           </div>
         )}
@@ -394,7 +438,7 @@ export function SleepScreen() {
                   {remind30Min ? <Bell size={18} className="text-blue-500" /> : <BellOff size={18} style={{ color: secondaryText }} />}
                   <div className="flex flex-col">
                     <span className="text-sm font-medium" style={{ color: textColor }}>Nhắc đi ngủ</span>
-                    <span className="text-xs" style={{ color: secondaryText }}>Gửi thông báo trước 30 phút</span>
+                    <span className="text-xs" style={{ color: secondaryText }}>Nhắc trước 30 phút và xác nhận giờ đi ngủ</span>
                   </div>
                 </div>
                 <button onClick={() => setRemind30Min(!remind30Min)} className={`w-12 h-6 rounded-full transition-colors relative ${remind30Min ? 'bg-blue-500' : 'bg-gray-300'}`}>

@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Bell, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Plus, Trash2, X } from 'lucide-react';
 import { useApp } from '../lib/AppContext';
 import { supabase, type SubTask, type Task } from '../lib/supabase';
-import { deadlineAtEndOfDay, localDateKey, taskDeadlineDate } from '../lib/taskDates';
+import { deadlineAt, deadlineCountdown, localDateKey, taskDeadlineDate } from '../lib/taskDates';
 
 type Category = Task['category'];
 type DraftSubtask = { id?: string; title: string; completed: boolean };
@@ -12,6 +12,7 @@ type TaskDraft = {
   category: Category;
   reminderEnabled: boolean;
   deadlineDate: string;
+  deadlineTime: string;
   remindBefore: number;
   subtasks: DraftSubtask[];
 };
@@ -60,6 +61,9 @@ function createDraft(date: string, task?: Task): TaskDraft {
     category: task?.category ?? 'study',
     reminderEnabled: task?.reminder_enabled ?? false,
     deadlineDate: task?.deadline ? taskDeadlineDate(task.deadline) : date,
+    deadlineTime: task?.deadline
+      ? `${String(new Date(task.deadline).getHours()).padStart(2, '0')}:${String(new Date(task.deadline).getMinutes()).padStart(2, '0')}`
+      : '23:59',
     remindBefore: task?.remind_before ?? 15,
     subtasks,
   };
@@ -125,9 +129,9 @@ export function CalendarScreen() {
       setError('Vui lòng nhập tên công việc.');
       return;
     }
-    const deadline = deadlineAtEndOfDay(draft.deadlineDate);
+    const deadline = deadlineAt(draft.deadlineDate, draft.deadlineTime);
     if (!deadline) {
-      setError('Vui lòng chọn ngày deadline hợp lệ.');
+      setError('Vui lòng chọn ngày và giờ deadline hợp lệ.');
       return;
     }
 
@@ -410,6 +414,12 @@ export function CalendarScreen() {
                   className="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm outline-none focus:border-[#CFFB2B]" />
               </label>
 
+              <label className="mb-4 block">
+                <span className="mb-2 block text-[11px] font-bold text-[#B5C0B7]">GIỜ DEADLINE</span>
+                <input required type="time" value={draft.deadlineTime} onChange={event => patchDraft({ deadlineTime: event.target.value })}
+                  className="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm outline-none focus:border-[#CFFB2B]" />
+              </label>
+
               <fieldset className="mb-4">
                 <legend className="mb-2 text-[11px] font-bold text-[#B5C0B7]">DANH MỤC</legend>
                 <div className="flex flex-wrap gap-2">
@@ -520,7 +530,12 @@ function TaskCard({
 }) {
   const complete = task.status === 'completed';
   const deadlineDate = taskDeadlineDate(task.deadline);
-  const overdue = !complete && deadlineDate < localDateKey();
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const overdue = !complete && Boolean(task.deadline && new Date(task.deadline).getTime() < now);
   const category = CATEGORY_STYLE[task.category];
   const checklist = task.subtasks ?? [];
   const progress = checklist.length ? Math.round(checklist.filter(item => item.completed).length * 100 / checklist.length) : 0;
@@ -548,7 +563,9 @@ function TaskCard({
           <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-semibold text-[#879189]">
             {deadlineDate && <span className={overdue ? 'text-red-600' : ''}>
               Deadline {parseDate(deadlineDate).toLocaleDateString('vi-VN', { day: 'numeric', month: 'long', year: 'numeric' })}
+              {task.deadline && ` lúc ${new Date(task.deadline).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`}
             </span>}
+            {!complete && task.deadline && <span className={overdue ? 'text-red-600' : 'text-[#3D8B55]'}>{deadlineCountdown(task.deadline, now)}</span>}
             {task.reminder_enabled && <span className="inline-flex items-center gap-1"><Bell size={10} />Nhắc nhở</span>}
           </div>
           {checklist.length > 0 && (

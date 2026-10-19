@@ -5,6 +5,7 @@ import {
   CheckCheck,
   ChevronLeft,
   CalendarDays,
+  Check,
   Moon,
   Settings,
   Trash2,
@@ -13,13 +14,28 @@ import {
 } from 'lucide-react';
 import { useApp } from '../lib/AppContext';
 import { supabase } from '../lib/supabase';
-import { taskDeadlineDate } from '../lib/taskDates';
+import { deadlineCountdown, localDateKey, taskDeadlineDate } from '../lib/taskDates';
+import {
+  getSleepBedtimeCheckIn,
+  saveConfirmedSleepLog,
+  saveSleepBedtimeCheckIn,
+  sleepBedtimeDateKeyForWake,
+} from '../lib/sleepCheckIns';
 import type { Meal, MealType, SleepLog, Task } from '../lib/supabase';
 import styles from './NotificationCenter.module.css';
 
 type Category = 'task' | 'meal' | 'sleep';
 type Filter = 'all' | Category;
-type NotificationAction = 'view' | 'complete' | 'log-meal' | 'view-sleep';
+type NotificationAction = 'view' | 'complete' | 'log-meal' | 'view-sleep' | 'confirm-bedtime' | 'confirm-wake';
+type SleepScheduleReminder = {
+  id: string;
+  wakeTime: string;
+  bedTime: string;
+  applyDays: number[];
+  remind30Min: boolean;
+  alarmEnabled: boolean;
+  isActive: boolean;
+};
 type AppNotification = {
   id: string;
   category: Category;
@@ -28,6 +44,8 @@ type AppNotification = {
   createdAt: number;
   urgent?: boolean;
   task?: Task;
+  sleepSchedule?: SleepScheduleReminder;
+  sleepDateKey?: string;
   actions: NotificationAction[];
 };
 type Preferences = {
@@ -85,18 +103,34 @@ const CATEGORY_COLORS: Record<Category, { foreground: string; background: string
 };
 const EMPTY_INBOX: InboxState = { readIds: [], dismissedIds: [] };
 
-function localDateKey(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
 function dateAtTime(date: Date, time: string) {
   const [hours, minutes] = time.split(':').map(Number);
   const result = new Date(date);
   result.setHours(hours || 0, minutes || 0, 0, 0);
   return result;
+}
+
+function readSleepSchedules(userId: string): SleepScheduleReminder[] {
+  try {
+    const raw = window.localStorage.getItem(`sleepSchedules_${userId}`);
+    if (!raw) return [];
+    const value: unknown = JSON.parse(raw);
+    if (!Array.isArray(value)) throw new Error('Sleep schedules must be an array.');
+    return value.filter((item): item is SleepScheduleReminder =>
+      typeof item === 'object' && item !== null
+      && typeof item.id === 'string'
+      && typeof item.wakeTime === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(item.wakeTime)
+      && typeof item.bedTime === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(item.bedTime)
+      && Array.isArray(item.applyDays)
+      && item.applyDays.every((day: unknown) => Number.isInteger(day) && Number(day) >= 0 && Number(day) <= 6)
+      && typeof item.remind30Min === 'boolean'
+      && typeof item.alarmEnabled === 'boolean'
+      && typeof item.isActive === 'boolean',
+    );
+  } catch (error) {
+    console.error('Unable to read sleep reminder schedules:', error);
+    return [];
+  }
 }
 
 function getStorage<T>(key: string, fallback: T): T {
@@ -132,6 +166,8 @@ function buildNotifications(
   sleepLogs: SleepLog[],
   profile: ReturnType<typeof useApp>['profile'],
   preferences: Preferences,
+  sleepSchedules: SleepScheduleReminder[],
+  userId?: string,
 ): AppNotification[] {
   const notices: AppNotification[] = [];
   const nowMs = now.getTime();
@@ -146,8 +182,8 @@ function buildNotifications(
       if (task.status === 'completed' || !task.deadline) return;
       const deadlineKey = taskDeadlineDate(task.deadline);
       if (!deadlineKey) return;
-      const [year, month, day] = deadlineKey.split('-').map(Number);
-      const deadline = new Date(year, month - 1, day, 23, 59, 59, 999);
+      const deadline = new Date(task.deadline);
+      if (Number.isNaN(deadline.getTime())) return;
       const remaining = deadline.getTime() - nowMs;
       if (remaining > leadMinutes * 60_000 || remaining < -24 * 60 * 60_000) return;
       const urgent = remaining <= 60 * 60_000;
@@ -156,8 +192,8 @@ function buildNotifications(
         category: 'task',
         title: urgent ? `Sắp đến hạn: ${task.title}` : `Nhắc deadline: ${task.title}`,
         body: remaining < 0
-          ? `Nhiệm vụ đã quá hạn từ ${deadline.toLocaleDateString('vi-VN')}. Cập nhật trạng thái để tiếp tục theo dõi.`
-          : `Hạn ${deadline.toLocaleDateString('vi-VN')}. Hoàn thành sớm để không bị trễ.`,
+          ? `${deadlineCountdown(task.deadline, nowMs)} · Hạn ${deadline.toLocaleString('vi-VN', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}. Cập nhật trạng thái để tiếp tục theo dõi.`
+          : `${deadlineCountdown(task.deadline, nowMs)} · Hạn ${deadline.toLocaleString('vi-VN', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}.`,
         createdAt: remaining > 0
           ? Math.min(nowMs, deadline.getTime() - leadMinutes * 60_000)
           : deadline.getTime(),
@@ -205,16 +241,61 @@ function buildNotifications(
         createdAt: new Date(`${todayKey}T08:00:00`).getTime(),
         actions: ['view-sleep'],
       });
-    } else {
-      const bedtime = dateAtTime(now, '23:00');
-      if (nowMs >= bedtime.getTime()) {
+    }
+
+    sleepSchedules.filter(schedule =>
+      schedule.isActive && schedule.applyDays.includes(now.getDay()),
+    ).forEach(schedule => {
+      if (schedule.remind30Min) {
+        const reminderAt = new Date(dateAtTime(now, schedule.bedTime).getTime() - 30 * 60_000);
+        if (nowMs >= reminderAt.getTime() && nowMs < dateAtTime(now, schedule.bedTime).getTime()) {
+          notices.push({
+            id: `sleep:bedtime-reminder:${schedule.id}:${todayKey}`,
+            category: 'sleep',
+            title: 'Sắp đến giờ đi ngủ',
+            body: `Còn khoảng 30 phút đến giờ ngủ đã đặt (${schedule.bedTime}).`,
+            createdAt: reminderAt.getTime(),
+            sleepSchedule: schedule,
+            sleepDateKey: todayKey,
+            actions: ['view-sleep'],
+          });
+        }
+      }
+
+      const bedtimeAt = dateAtTime(now, schedule.bedTime);
+      let bedtimeConfirmed: Date | null = null;
+      if (userId) {
+        try {
+          bedtimeConfirmed = getSleepBedtimeCheckIn(userId, schedule.id, todayKey);
+        } catch (error) {
+          console.error('Unable to check bedtime confirmation:', error);
+        }
+      }
+      if (schedule.remind30Min && nowMs >= bedtimeAt.getTime() && !bedtimeConfirmed) {
         notices.push({
-          id: `sleep:reminder:${todayKey}`,
+          id: `sleep:bedtime:${schedule.id}:${todayKey}`,
           category: 'sleep',
-          title: 'Đến giờ chuẩn bị đi ngủ',
-          body: 'Hãy thư giãn và chuẩn bị nghỉ ngơi để duy trì lịch ngủ đều đặn.',
-          createdAt: bedtime.getTime(),
-          actions: ['view-sleep'],
+          title: 'Đã đến giờ đi ngủ',
+          body: `Bạn đã đến giờ ngủ theo lịch ${schedule.bedTime}. Xác nhận để ghi lại giờ bắt đầu giấc ngủ.`,
+          createdAt: bedtimeAt.getTime(),
+          sleepSchedule: schedule,
+          sleepDateKey: todayKey,
+          actions: ['confirm-bedtime', 'view-sleep'],
+        });
+      }
+
+      const wakeAt = dateAtTime(now, schedule.wakeTime);
+      const wokeToday = todaySleep?.wake_time || todaySleep?.duration_minutes != null;
+      if (schedule.alarmEnabled && nowMs >= wakeAt.getTime() && !wokeToday) {
+        notices.push({
+          id: `sleep:wake:${schedule.id}:${todayKey}`,
+          category: 'sleep',
+          title: 'Bạn đã thức dậy chưa?',
+          body: `Đã đến giờ thức dậy theo lịch ${schedule.wakeTime}. Xác nhận để ghi nhận thời gian ngủ của bạn.`,
+          createdAt: wakeAt.getTime(),
+          sleepSchedule: schedule,
+          sleepDateKey: sleepBedtimeDateKeyForWake(now, schedule.bedTime, schedule.wakeTime),
+          actions: ['confirm-wake', 'view-sleep'],
         });
       }
     }
@@ -276,7 +357,7 @@ function categoryIcon(category: Category, urgent: boolean) {
 }
 
 export function NotificationCenter() {
-  const { user, profile, tasks, meals, sleepLogs, setScreen, refreshTasks } = useApp();
+  const { user, profile, tasks, meals, sleepLogs, setScreen, refreshTasks, refreshSleep } = useApp();
   const storageSuffix = user?.id ?? 'guest';
   const preferencesKey = `goclock-notification-preferences:${storageSuffix}`;
   const inboxKey = `goclock-notification-inbox:${storageSuffix}`;
@@ -285,6 +366,7 @@ export function NotificationCenter() {
   const [filter, setFilter] = useState<Filter>('all');
   const [preferences, setPreferences] = useState<Preferences>(() => getStorage(preferencesKey, DEFAULT_PREFERENCES));
   const [inbox, setInbox] = useState<InboxState>(() => getStorage(inboxKey, EMPTY_INBOX));
+  const [sleepSchedules, setSleepSchedules] = useState<SleepScheduleReminder[]>([]);
   const [now, setNow] = useState(() => new Date());
   const [toast, setToast] = useState('');
   const [undoState, setUndoState] = useState<UndoState | null>(null);
@@ -297,7 +379,8 @@ export function NotificationCenter() {
     skipInboxWrite.current = true;
     setPreferences(getStorage(preferencesKey, DEFAULT_PREFERENCES));
     setInbox(getStorage(inboxKey, EMPTY_INBOX));
-  }, [inboxKey, preferencesKey]);
+    setSleepSchedules(user?.id ? readSleepSchedules(user.id) : []);
+  }, [inboxKey, preferencesKey, user?.id]);
 
   useEffect(() => {
     if (skipPreferenceWrite.current) {
@@ -342,9 +425,9 @@ export function NotificationCenter() {
   }, [isOpen, showSettings]);
 
   const notifications = useMemo(
-    () => buildNotifications(now, tasks, meals, sleepLogs, profile, preferences)
+    () => buildNotifications(now, tasks, meals, sleepLogs, profile, preferences, sleepSchedules, user?.id)
       .filter(notification => !inbox.dismissedIds.includes(notification.id)),
-    [inbox.dismissedIds, meals, now, preferences, profile, sleepLogs, tasks],
+    [inbox.dismissedIds, meals, now, preferences, profile, sleepLogs, sleepSchedules, tasks, user?.id],
   );
   const unreadCount = notifications.filter(notification => !inbox.readIds.includes(notification.id)).length;
   const filteredNotifications = notifications.filter(notification => filter === 'all' || notification.category === filter);
@@ -400,6 +483,67 @@ export function NotificationCenter() {
     markRead(notification.id);
     setError('');
 
+    if (action === 'confirm-bedtime' && notification.sleepSchedule && notification.sleepDateKey && user) {
+      try {
+        saveSleepBedtimeCheckIn(user.id, notification.sleepSchedule.id, new Date());
+        setInbox(current => ({
+          ...current,
+          dismissedIds: [...new Set([...current.dismissedIds, notification.id])],
+        }));
+        setToast('Đã ghi nhận giờ đi ngủ');
+        setNow(new Date());
+      } catch (checkInError) {
+        console.error('Unable to save bedtime confirmation:', checkInError);
+        setError('Không thể lưu giờ đi ngủ trên thiết bị này. Hãy kiểm tra bộ nhớ trình duyệt.');
+      }
+      return;
+    }
+
+    if (action === 'confirm-wake' && notification.sleepSchedule && notification.sleepDateKey && user) {
+      const confirmedAt = new Date();
+      let bedtime: Date | null = null;
+      try {
+        bedtime = getSleepBedtimeCheckIn(
+          user.id,
+          notification.sleepSchedule.id,
+          notification.sleepDateKey,
+        );
+      } catch (checkInError) {
+        console.error('Unable to read bedtime confirmation:', checkInError);
+        setError('Không thể đọc giờ đi ngủ đã lưu. Hãy kiểm tra bộ nhớ trình duyệt.');
+        return;
+      }
+      const durationMinutes = bedtime
+        ? Math.round((confirmedAt.getTime() - bedtime.getTime()) / 60_000)
+        : null;
+      const validDuration = durationMinutes != null && durationMinutes > 0 && durationMinutes <= 24 * 60
+        ? durationMinutes
+        : null;
+      const { error: saveError } = await saveConfirmedSleepLog(user.id, localDateKey(confirmedAt), {
+        bedtime: validDuration ? bedtime!.toISOString() : null,
+        wake_time: confirmedAt.toISOString(),
+        duration_minutes: validDuration,
+        cycles: validDuration ? Math.max(1, Math.round(validDuration / 90)) : 5,
+        target_bedtime: notification.sleepSchedule.bedTime,
+        target_wake_time: notification.sleepSchedule.wakeTime,
+      });
+      if (saveError) {
+        console.error('Unable to save wake confirmation:', saveError);
+        setError('Không thể lưu xác nhận thức dậy. Vui lòng thử lại.');
+        return;
+      }
+      await refreshSleep();
+      setInbox(current => ({
+        ...current,
+        dismissedIds: [...new Set([...current.dismissedIds, notification.id])],
+      }));
+      setToast(validDuration
+        ? `Đã ghi nhận ${Math.floor(validDuration / 60)} giờ ${validDuration % 60} phút ngủ`
+        : 'Đã ghi nhận giờ thức dậy. Hãy xác nhận giờ đi ngủ để tính thời lượng.');
+      setNow(new Date());
+      return;
+    }
+
     if (action === 'complete' && notification.task && user) {
       const task = notification.task;
       const { error: updateError } = await supabase
@@ -434,12 +578,21 @@ export function NotificationCenter() {
     }));
   }
 
+  function openNotifications() {
+    setInbox(current => ({
+      ...current,
+      readIds: [...new Set([...current.readIds, ...notifications.map(notification => notification.id)])],
+    }));
+    setIsOpen(true);
+    setShowSettings(false);
+  }
+
   return (
     <>
       <button
         type="button"
         className={styles.bellButton}
-        onClick={() => { setIsOpen(true); setShowSettings(false); }}
+        onClick={openNotifications}
         aria-label={`Thông báo${unreadCount ? `, ${unreadCount} chưa đọc` : ''}`}
       >
         <Bell size={18} />
@@ -523,7 +676,12 @@ export function NotificationCenter() {
                           <div className={styles.meta}>
                             <span>{notificationTime(notification.createdAt, now)}</span>
                             {notification.task?.status !== 'completed' && notification.task?.deadline && (
-                              <span className={styles.deadlineChip}><CalendarDays size={12} />{new Date(notification.task.deadline).toLocaleDateString('vi-VN')}</span>
+                              <span className={styles.deadlineChip}>
+                                <CalendarDays size={12} />
+                                {new Date(notification.task.deadline).toLocaleString('vi-VN', {
+                                  day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+                                })}
+                              </span>
                             )}
                           </div>
                           {notification.actions.length > 0 && (
@@ -532,10 +690,15 @@ export function NotificationCenter() {
                                 <button
                                   type="button"
                                   key={action}
-                                  className={action === 'complete' || action === 'log-meal' ? styles.primaryAction : ''}
+                                  className={action === 'complete' || action === 'log-meal' || action === 'confirm-bedtime' || action === 'confirm-wake' ? styles.primaryAction : ''}
                                   onClick={() => void handleAction(notification, action)}
                                 >
-                                  {action === 'view' ? 'Xem lịch' : action === 'complete' ? 'Hoàn thành' : action === 'log-meal' ? 'Ghi bữa ăn' : 'Xem giấc ngủ'}
+                                  {action === 'view' ? 'Xem lịch'
+                                    : action === 'complete' ? 'Hoàn thành'
+                                      : action === 'log-meal' ? 'Ghi bữa ăn'
+                                        : action === 'confirm-bedtime' ? 'Xác nhận đi ngủ'
+                                          : action === 'confirm-wake' ? 'Tôi đã thức dậy'
+                                            : 'Xem giấc ngủ'}
                                 </button>
                               ))}
                             </div>
@@ -603,7 +766,7 @@ export function NotificationCenter() {
                   />
                   <PreferenceToggle
                     title="Giấc ngủ"
-                    description="Hiển thị nhắc nhở và tổng kết giấc ngủ"
+                    description="Nhắc giờ ngủ, xác nhận thức dậy và tổng kết giấc ngủ"
                     enabled={preferences.sleep}
                     onToggle={() => togglePreference('sleep')}
                   />

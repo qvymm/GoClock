@@ -7,7 +7,7 @@ import { CoachmarksOverlay } from '../components/CoachmarksOverlay';
 import { NotificationCenter } from '../components/NotificationCenter';
 import { supabase } from '../lib/supabase';
 import type { Task } from '../lib/supabase';
-import { deadlineAtEndOfDay, localDateKey, taskDeadlineDate } from '../lib/taskDates';
+import { deadlineAt, deadlineCountdown, localDateKey, taskDeadlineDate } from '../lib/taskDates';
 
 // ── Helpers ──────────────────────────────────────────────────
 const CAT_COLOR: Record<string, string> = {
@@ -37,6 +37,7 @@ export function DashboardScreen() {
     description: '',
     category: 'personal' as Task['category'],
     deadlineDate: localDateKey(),
+    deadlineTime: '23:59',
     reminderEnabled: false,
   });
 
@@ -88,8 +89,12 @@ export function DashboardScreen() {
 
   const todayCalories = meals.reduce((s, m) => s + m.calories, 0);
   const targetCalories = profile?.tdee || 0;
-  const lastSleep = sleepLogs[0];
-  const sleepHours = lastSleep?.duration_minutes ? (lastSleep.duration_minutes / 60).toFixed(1) : null;
+  const todaySleep = sleepLogs.find(log => log.log_date === localDateKey(time));
+  const lastSleep = todaySleep ?? sleepLogs.find(log => log.duration_minutes != null);
+  const displayedSleepMinutes = todaySleep
+    ? todaySleep.duration_minutes
+    : lastSleep?.duration_minutes;
+  const sleepHours = displayedSleepMinutes != null ? (displayedSleepMinutes / 60).toFixed(1) : null;
   const sleepQuality = lastSleep?.quality;
 
   // Calorie circular progress
@@ -115,6 +120,7 @@ export function DashboardScreen() {
       description: '',
       category: 'personal',
       deadlineDate: localDateKey(),
+      deadlineTime: '23:59',
       reminderEnabled: false,
     });
     setTaskFormError('');
@@ -127,9 +133,9 @@ export function DashboardScreen() {
       setTaskFormError('Bạn cần đăng nhập để tạo công việc.');
       return;
     }
-    const deadline = deadlineAtEndOfDay(newTask.deadlineDate);
+    const deadline = deadlineAt(newTask.deadlineDate, newTask.deadlineTime);
     if (!deadline) {
-      setTaskFormError('Vui lòng chọn ngày deadline hợp lệ.');
+      setTaskFormError('Vui lòng chọn ngày và giờ deadline hợp lệ.');
       return;
     }
     setSavingTask(true);
@@ -266,6 +272,9 @@ export function DashboardScreen() {
                 style={{ background: '#ebdcb9', color: '#967c3b' }}>
                 {getSleepLabel(sleepQuality)}
               </span>}
+              {todaySleep && todaySleep.duration_minutes == null && (
+                <span className="mt-2 text-center text-[9px] font-medium text-gray-400">Xác nhận giờ đi ngủ để tính thời lượng</span>
+              )}
             </div>
           </div>
         </div>
@@ -334,7 +343,13 @@ export function DashboardScreen() {
                             </span>
                             <span className="text-[9px] font-medium text-gray-400">
                               Deadline {task.deadline ? new Date(task.deadline).toLocaleDateString('vi-VN') : ''}
+                              {task.deadline && ` · ${new Date(task.deadline).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`}
                             </span>
+                            {!isDone && task.deadline && (
+                              <span className={`text-[9px] font-bold ${new Date(task.deadline).getTime() <= time.getTime() ? 'text-red-500' : 'text-[#4A9D67]'}`}>
+                                {deadlineCountdown(task.deadline, time.getTime())}
+                              </span>
+                            )}
                           </div>
                         </div>
                         <ChevronRight size={16} className="text-gray-300 flex-shrink-0 mt-1" />
@@ -393,6 +408,12 @@ export function DashboardScreen() {
                   onChange={event => setNewTask(value => ({ ...value, deadlineDate: event.target.value }))}
                   className="w-full bg-transparent py-3 text-sm text-white outline-none" />
               </span>
+            </label>
+            <label className="mb-4 block">
+              <span className="mb-2 block text-[11px] font-bold text-[#B5C0B7]">GIỜ DEADLINE</span>
+              <input required type="time" value={newTask.deadlineTime}
+                onChange={event => setNewTask(value => ({ ...value, deadlineTime: event.target.value }))}
+                className="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white outline-none" />
             </label>
             <label className="mb-4 flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3">
               <span className="text-xs font-semibold">Nhắc nhở</span>

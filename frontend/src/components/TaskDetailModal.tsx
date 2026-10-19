@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { X, CalendarDays, Tag, Bell, CheckCircle2, Circle, Pencil, ChevronRight } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useApp } from '../lib/AppContext';
 import type { Task, SubTask } from '../lib/supabase';
-import { localDateKey, taskDeadlineDate } from '../lib/taskDates';
+import { deadlineCountdown, localDateKey, taskDeadlineDate } from '../lib/taskDates';
 
 type Props = {
   task: Task;
@@ -17,9 +17,19 @@ export function TaskDetailModal({ task, onClose }: Props) {
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(task.title);
   const [editDesc, setEditDesc] = useState(task.description || '');
+  const [now, setNow] = useState(() => Date.now());
 
   const deadlineDate = taskDeadlineDate(task.deadline);
-  const isOverdue = deadlineDate && deadlineDate < localDateKey() && task.status !== 'completed';
+  const isOverdue = Boolean(task.status !== 'completed' && (
+    task.deadline
+      ? new Date(task.deadline).getTime() < now
+      : deadlineDate && deadlineDate < localDateKey()
+  ));
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   function getStatusInfo() {
     if (task.status === 'completed') return { label: 'Hoàn thành', bg: '#e6f4ea', color: '#137333' };
@@ -108,11 +118,16 @@ export function TaskDetailModal({ task, onClose }: Props) {
           {/* Info grid */}
           <div className="rounded-2xl overflow-hidden mb-4" style={{ border: '1px solid #e8f0e8' }}>
             {[
-              { icon: <CalendarDays size={14} />, label: 'Deadline', value: deadlineDate ? new Date(`${deadlineDate}T00:00:00`).toLocaleDateString('vi-VN') : 'Không có' },
+              { icon: <CalendarDays size={14} />, label: 'Deadline', value: deadlineDate && task.deadline
+                ? `${new Date(`${deadlineDate}T00:00:00`).toLocaleDateString('vi-VN')} · ${new Date(task.deadline).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`
+                : 'Không có' },
+              ...(task.deadline && task.status !== 'completed'
+                ? [{ icon: <CalendarDays size={14} />, label: 'Đếm ngược', value: deadlineCountdown(task.deadline, now) }]
+                : []),
               { icon: <Bell size={14} />, label: 'Nhắc nhở', value: task.reminder_enabled ? 'Đã bật' : 'Đã tắt' },
               { icon: <Tag size={14} />, label: 'Thời gian tạo', value: new Date(task.created_at).toLocaleDateString('vi-VN') },
             ].map((row, i) => (
-              <div key={i} className="flex items-center gap-3 px-4 py-3" style={{ background: i % 2 === 0 ? '#f8fbf8' : '#fff', borderBottom: i < 2 ? '1px solid #f0f4f0' : 'none' }}>
+              <div key={i} className="flex items-center gap-3 px-4 py-3" style={{ background: i % 2 === 0 ? '#f8fbf8' : '#fff', borderBottom: i < (task.deadline && task.status !== 'completed' ? 3 : 2) ? '1px solid #f0f4f0' : 'none' }}>
                 <div style={{ color: '#173325' }}>{row.icon}</div>
                 <span className="text-xs text-gray-500 w-24 flex-shrink-0">{row.label}</span>
                 <span className="text-xs font-medium text-right flex-1" style={{ color: '#202124' }}>{row.value}</span>

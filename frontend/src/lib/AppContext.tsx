@@ -140,6 +140,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .select('*')
       .eq('user_id', user.id)
       .order('log_date', { ascending: false })
+      .order('created_at', { ascending: false })
       .limit(7);
     if (data) setSleepLogs(data as SleepLog[]);
   }
