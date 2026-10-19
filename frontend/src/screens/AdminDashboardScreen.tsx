@@ -332,45 +332,45 @@ export function AdminDashboardScreen() {
                   description="Monthly recurring revenue" icon={Wallet} iconClass="bg-violet-50 text-violet-600" />
               </div>
 
-              <div className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <ChartCard title="User Growth" description="Jan - Jun" icon={TrendingUp}>
-                    <div className="mt-5 h-64">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={userGrowth} margin={{ top: 10, right: 0, left: -10, bottom: 0 }}>
-                          <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
-                          <XAxis dataKey="month" tickLine={false} axisLine={false} />
-                          <YAxis domain={[0, 14000]} ticks={[0, 2000, 4000, 6000, 8000, 10000, 12000, 14000]}
-                            tickFormatter={(value) => `${value / 1000}k`} tickLine={false} axisLine={false} />
-                          <Tooltip formatter={(value: number) => value.toLocaleString()} />
-                          <Line type="monotone" dataKey="users" stroke="#2563eb" strokeWidth={3} dot={{ r: 4 }} />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </ChartCard>
+              <div className="grid grid-cols-1 gap-4">
+                <ChartCard title="User Growth" description="Jan - Jun" icon={TrendingUp}>
+                  <div className="mt-5 h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={userGrowth} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
+                        <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
+                        <XAxis dataKey="month" tickLine={false} axisLine={false} />
+                        <YAxis domain={[0, 'auto']} width={52} tick={{ fontSize: 11 }}
+                          tickFormatter={(value) => new Intl.NumberFormat('vi-VN', { notation: 'compact', maximumFractionDigits: 1 }).format(value)}
+                          tickLine={false} axisLine={false} />
+                        <Tooltip formatter={(value: number) => value.toLocaleString('vi-VN')} />
+                        <Line type="monotone" dataKey="users" stroke="#2563eb" strokeWidth={3} dot={{ r: 4 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </ChartCard>
 
-                  <ChartCard title="Revenue Trend" description="Jan - Jun" icon={CreditCard}>
-                    <div className="mt-5 h-64">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={revenueTrend} margin={{ top: 10, right: 0, left: -10, bottom: 0 }}>
-                          <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
-                          <XAxis dataKey="month" tickLine={false} axisLine={false} />
-                          <YAxis domain={[0, 60_000_000]} ticks={[0, 10_000_000, 20_000_000, 30_000_000, 40_000_000, 50_000_000, 60_000_000]}
-                            tickFormatter={(value) => `${value / 1_000_000}M`} tickLine={false} axisLine={false} />
-                          <Tooltip content={<RevenueTooltip />} />
-                          <Line type="monotone" dataKey="revenue" stroke="#16a34a" strokeWidth={3} dot={{ r: 4 }} />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </ChartCard>
-                </div>
+                <ChartCard title="Revenue Trend" description="Jan - Jun" icon={CreditCard}>
+                  <div className="mt-5 h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={revenueTrend} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
+                        <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
+                        <XAxis dataKey="month" tickLine={false} axisLine={false} />
+                        <YAxis domain={[0, 'auto']} width={58} tick={{ fontSize: 11 }}
+                          tickFormatter={(value) => new Intl.NumberFormat('vi-VN', { notation: 'compact', maximumFractionDigits: 1 }).format(value)}
+                          tickLine={false} axisLine={false} />
+                        <Tooltip content={<RevenueTooltip />} />
+                        <Line type="monotone" dataKey="revenue" stroke="#16a34a" strokeWidth={3} dot={{ r: 4 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </ChartCard>
 
                 <ChartCard title="Feature Usage" description="Task, Meal, Sleep" icon={CircleDot}>
-                  <div className="mt-5 flex flex-col items-center gap-4 md:flex-row md:items-end md:justify-between">
-                    <div className="h-56 w-full md:w-1/2">
+                  <div className="mt-5 flex flex-col items-center gap-4 md:flex-row md:items-center md:justify-between">
+                    <div className="h-72 w-full md:w-1/2">
                       <ResponsiveContainer width="100%" height="100%">
                         <RechartPieChart>
-                          <Pie data={featureUsageDataState} dataKey="value" nameKey="name" innerRadius={50} outerRadius={80} fill="#2563eb">
+                          <Pie data={featureUsageDataState} dataKey="value" nameKey="name" innerRadius={62} outerRadius={102} fill="#2563eb">
                             {featureUsageDataState.map((_, index) => (
                               <Cell key={`cell-${index}`} fill={featureColors[index]} />
                             ))}
@@ -378,7 +378,7 @@ export function AdminDashboardScreen() {
                         </RechartPieChart>
                       </ResponsiveContainer>
                     </div>
-                    <div className="grid gap-3 w-full md:w-1/2">
+                    <div className="grid w-full gap-3 md:w-1/2">
                       {featureUsageDataState.map((item, index) => (
                         <div key={item.name} className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
                           <div className="flex items-center justify-between gap-3">
