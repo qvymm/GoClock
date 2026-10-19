@@ -3,6 +3,7 @@ import {
   ArrowRight,
   Bell,
   CalendarDays,
+  CheckCircle2,
   CircleDot,
   CreditCard,
   Lock,
@@ -321,7 +322,7 @@ export function AdminDashboardScreen() {
                   {' '}Hãy chạy migration `20261014160000_add_admin_dashboard_stats_rpc.sql` trong đúng project Supabase.
                 </p>
               )}
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
                 <KpiCard label="Users" value={dashboardStats.totalUsers.toLocaleString('vi-VN')}
                   description="Total users registered" icon={User} iconClass="bg-sky-50 text-sky-600" />
                 <KpiCard label="Active" value={dashboardStats.activeUsersToday.toLocaleString('vi-VN')}
@@ -330,6 +331,8 @@ export function AdminDashboardScreen() {
                   description="Premium users" icon={Star} iconClass="bg-orange-50 text-orange-600" />
                 <KpiCard label="Revenue" value={`${dashboardStats.monthlyRevenue.toLocaleString('vi-VN')} VNĐ`}
                   description="Monthly recurring revenue" icon={Wallet} iconClass="bg-violet-50 text-violet-600" />
+                <KpiCard label="Successful Transactions" value={dashboardStats.successfulTransactions.toLocaleString('vi-VN')}
+                  description="Paid Premium orders" icon={CheckCircle2} iconClass="bg-emerald-50 text-emerald-600" />
               </div>
 
               <div className="grid grid-cols-1 gap-4">
