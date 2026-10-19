@@ -302,6 +302,7 @@ export function AdminDashboardScreen() {
   };
 
   const selectedAnalytics = analyticsCardsState[analyticsTab];
+  const visibleLandingSources = landingSources.filter(({ source }) => source !== 'direct/unknown');
 
   function handleSendNotification(type: 'now' | 'schedule') {
     setNotificationStatus(`Thông báo đã ${type === 'now' ? 'gửi ngay' : 'lên lịch'} cho ${notification.target === 'all' ? 'tất cả người dùng' : notification.target === 'premium' ? 'Premium users' : 'Free users'}.`);
@@ -615,15 +616,15 @@ export function AdminDashboardScreen() {
                   </div>
                 </div>
                 {landingStatsError && <p role="alert" className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">{landingStatsError}</p>}
-                {!landingStatsError && !loadingLandingStats && landingSources.length === 0 && (
-                  <p className="mt-5 rounded-2xl bg-slate-50 px-4 py-5 text-sm text-slate-500">Chưa có lượt truy cập được ghi nhận trong khoảng thời gian này.</p>
+                {!landingStatsError && !loadingLandingStats && visibleLandingSources.length === 0 && (
+                  <p className="mt-5 rounded-2xl bg-slate-50 px-4 py-5 text-sm text-slate-500">Chưa có lượt truy cập xác định được nguồn trong khoảng thời gian này.</p>
                 )}
-                {landingSources.length > 0 && (
+                {visibleLandingSources.length > 0 && (
                   <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    {landingSources.map(({ source, visits }) => {
+                    {visibleLandingSources.map(({ source, visits }) => {
                       const labels: Record<string, string> = {
                         facebook: 'Facebook', tiktok: 'TikTok', instagram: 'Instagram',
-                        zalo: 'Zalo', messenger: 'Messenger', 'direct/unknown': 'Trực tiếp / chưa rõ', other: 'Nguồn khác',
+                        zalo: 'Zalo', messenger: 'Messenger', other: 'Nguồn khác',
                       };
                       const percentage = landingVisits ? Math.round(visits * 100 / landingVisits) : 0;
                       return <div key={source} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
@@ -639,11 +640,6 @@ export function AdminDashboardScreen() {
                     })}
                   </div>
                 )}
-                <div className="mt-5 rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-950">
-                  <p className="font-semibold">Gắn UTM vào link chiến dịch</p>
-                  <p className="mt-1 break-all text-blue-900">?utm_source=facebook&amp;utm_medium=social&amp;utm_campaign=ten_chien_dich</p>
-                  <p className="mt-1 text-xs text-blue-800">Đổi utm_source thành tiktok, instagram, zalo hoặc messenger cho từng kênh. UTM giúp phân loại chính xác hơn referrer.</p>
-                </div>
               </div>
               <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
