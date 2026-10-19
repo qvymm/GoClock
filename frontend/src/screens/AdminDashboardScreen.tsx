@@ -182,7 +182,7 @@ export function AdminDashboardScreen() {
       if (!current) return;
       if (error) {
         console.error('Unable to load app rating summary:', error);
-        setRatingSummaryError('ChÆ°a táº£i Ä‘Æ°á»£c Ä‘Ã¡nh giÃ¡. HÃ£y cháº¡y migration Ä‘Ã¡nh giÃ¡ á»©ng dá»¥ng trÃªn Supabase.');
+        setRatingSummaryError('Chưa tải được đánh giá. Hãy chạy migration đánh giá ứng dụng trên Supabase.');
         return;
       }
       if (data && typeof data === 'object') {
@@ -638,7 +638,6 @@ export function AdminDashboardScreen() {
                   <div>
                     <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">Landing page · 30 ngày gần nhất</p>
                     <h3 className="mt-2 text-xl font-semibold text-slate-900">Khách truy cập đến từ đâu?</h3>
-                    <p className="mt-1 text-sm text-slate-500">Nguồn được nhận diện từ UTM hoặc referrer của trình duyệt.</p>
                   </div>
                   <div className="rounded-2xl bg-emerald-50 px-5 py-3">
                     <p className="text-xs font-medium text-emerald-800">Tổng lượt mở</p>
@@ -674,9 +673,9 @@ export function AdminDashboardScreen() {
               <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
                 <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
                   <div className="sm:min-w-52">
-                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-600">Pháº£n há»“i ngÆ°á»i dÃ¹ng</p>
-                    <h3 className="mt-2 text-xl font-semibold text-slate-900">ÄÃ¡nh giÃ¡ á»©ng dá»¥ng</h3>
-                    <p className="mt-1 text-sm text-slate-500">Tá»•ng há»£p Ä‘Ã¡nh giÃ¡ tá»« mÃ n Trá»£ giÃºp</p>
+                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-600">Phản hồi người dùng</p>
+                    <h3 className="mt-2 text-xl font-semibold text-slate-900">Đánh giá ứng dụng</h3>
+                    <p className="mt-1 text-sm text-slate-500">Tổng hợp đánh giá từ màn Trợ giúp</p>
                   </div>
                   <div className="flex items-center gap-3 rounded-2xl bg-amber-50 px-5 py-3">
                     <Star size={28} fill="#f5b301" color="#f5b301" />
