@@ -32,6 +32,11 @@ function AppInner() {
   }, []);
 
   useEffect(() => {
+    document.body.classList.toggle('admin-mode', screen === 'adminDashboard');
+    return () => document.body.classList.remove('admin-mode');
+  }, [screen]);
+
+  useEffect(() => {
     if (screen === 'adminDashboard' && !isAdmin) setScreen('login');
   }, [screen, isAdmin, setScreen]);
 
@@ -61,8 +66,8 @@ function AppInner() {
   }
 
   return (
-    <div className="w-full h-[100dvh] flex flex-col bg-black">
-      <div className="flex-1 relative flex flex-col overflow-hidden w-full h-full">
+    <div className={`w-full flex flex-col ${screen === 'adminDashboard' ? 'min-h-screen bg-[#F5F7F5]' : 'h-[100dvh] bg-black'}`}>
+      <div className={`flex-1 relative flex flex-col w-full ${screen === 'adminDashboard' ? 'min-h-screen' : 'h-full overflow-hidden'}`}>
         {renderScreen()}
       </div>
       {showNav && (
