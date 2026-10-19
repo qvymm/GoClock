@@ -298,7 +298,7 @@ function buildNotifications(
           actions: ['confirm-wake', 'view-sleep'],
         });
       }
-    }
+    });
   }
 
   if (preferences.summary && preferences.task) {
