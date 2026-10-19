@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { ArrowLeft, TrendingUp, TrendingDown, Target, Flame, Moon, Sun, CheckCircle2, Trophy, Star, Zap, Calendar, ChevronLeft, ChevronRight, Award, BarChart3, PieChart, Activity, Brain, Sparkles, Flame as Fire, Medal, Crown } from 'lucide-react';
 import { useApp } from '../lib/AppContext';
 import { supabase } from '../lib/supabase';
+import { localDateKey, taskDeadlineDate } from '../lib/taskDates';
 
 type TabType = 'daily' | 'weekly' | 'monthly' | 'insights';
 type TimeRange = 'day' | 'week' | 'month';
@@ -63,11 +64,8 @@ export function TrackingScreen() {
 
   // Calculate daily stats
   const dailyStats: DailyStats = useMemo(() => {
-    const today = new Date().toISOString().split('T')[0];
-    const todayTasks = tasks.filter(t => {
-      if (!t.deadline) return false;
-      return t.deadline.startsWith(today);
-    });
+    const today = localDateKey();
+    const todayTasks = tasks.filter(task => taskDeadlineDate(task.deadline) === today);
     const todayMeals = meals.filter(m => m.eaten_at?.startsWith(today));
     const todaySleep = sleepLogs.find(s => s.log_date === today);
 
@@ -99,8 +97,12 @@ export function TrackingScreen() {
       const date = new Date(value);
       return date >= from && date < to;
     };
-    const weekTasks = tasks.filter(task => inRange(task.deadline || task.created_at));
-    const previousTasks = tasks.filter(task => inRange(task.deadline || task.created_at, previousStart, start));
+    const taskInRange = (deadline?: string, from = start, to = end) => {
+      const key = taskDeadlineDate(deadline);
+      return !!key && key >= localDateKey(from) && key < localDateKey(to);
+    };
+    const weekTasks = tasks.filter(task => taskInRange(task.deadline));
+    const previousTasks = tasks.filter(task => taskInRange(task.deadline, previousStart, start));
     const weekMeals = meals.filter(meal => inRange(meal.eaten_at));
     const weekSleep = sleepLogs.filter(log => inRange(log.log_date));
     const completed = weekTasks.filter(task => task.status === 'completed').length;
@@ -115,7 +117,8 @@ export function TrackingScreen() {
     const previousCalories = meals.filter(meal => inRange(meal.eaten_at, previousStart, start)).reduce((sum, meal) => sum + (meal.calories || 0), 0);
     const currentCalories = weekMeals.reduce((sum, meal) => sum + (meal.calories || 0), 0);
     const dailyCompletion = weekTasks.reduce<Record<string, { total: number; done: number }>>((result, task) => {
-      const day = (task.deadline || task.created_at).slice(0, 10);
+      const day = taskDeadlineDate(task.deadline);
+      if (!day) return result;
       result[day] ||= { total: 0, done: 0 };
       result[day].total += 1;
       if (task.status === 'completed') result[day].done += 1;
@@ -146,7 +149,10 @@ export function TrackingScreen() {
       const date = new Date(value);
       return date >= start && date < end;
     };
-    const monthTasks = tasks.filter(task => inMonth(task.deadline || task.created_at));
+    const monthTasks = tasks.filter(task => {
+      const key = taskDeadlineDate(task.deadline);
+      return !!key && key >= localDateKey(start) && key < localDateKey(end);
+    });
     const monthMeals = meals.filter(meal => inMonth(meal.eaten_at));
     const monthSleep = sleepLogs.filter(log => inMonth(log.log_date));
     const completed = monthTasks.filter(task => task.status === 'completed').length;
@@ -242,7 +248,7 @@ export function TrackingScreen() {
   }
 
   const weekDays = getWeekDays();
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = localDateKey();
 
   // Mini chart component for weekly visualization
   function MiniChart({ data, height = 40 }: { data: number[]; height?: number }) {
@@ -533,8 +539,8 @@ function DailyTrackingView({ stats, theme, profile, ProgressRing, MiniChart }: a
 // Weekly Tracking View Component
 function WeeklyTrackingView({ stats, theme, weekDays, todayStr, ProgressRing, MiniChart, tasks }: any) {
   const dailyData = weekDays.map((day: Date) => {
-    const key = day.toISOString().slice(0, 10);
-    const dayTasks = tasks.filter((task: any) => (task.deadline || task.created_at)?.slice(0, 10) === key);
+    const key = localDateKey(day);
+    const dayTasks = tasks.filter((task: any) => taskDeadlineDate(task.deadline) === key);
     return dayTasks.length ? Math.round(dayTasks.filter((task: any) => task.status === 'completed').length / dayTasks.length * 100) : 0;
   });
   const dayNames = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
@@ -565,7 +571,7 @@ function WeeklyTrackingView({ stats, theme, weekDays, todayStr, ProgressRing, Mi
         </h3>
         <div className="flex gap-1 mb-2">
           {weekDays.map((d: Date, i: number) => {
-            const isToday = d.toISOString().split('T')[0] === todayStr;
+            const isToday = localDateKey(d) === todayStr;
             return (
               <div key={i} className="flex-1 flex flex-col items-center gap-1">
                 <div className="w-full rounded-t" style={{ height: `${dailyData[i]}%`, background: isToday ? '#94d400' : theme === 'dark' ? 'rgba(148,212,0,0.4)' : '#d1e8d8', minHeight: 2, transition: 'height 0.3s ease' }} />

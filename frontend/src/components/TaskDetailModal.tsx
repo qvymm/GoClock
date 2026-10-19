@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { X, Clock, Tag, RepeatIcon, Bell, CheckCircle2, Circle, Pencil, ChevronRight, Calendar, AlertCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, CalendarDays, Tag, Bell, CheckCircle2, Circle, Pencil, ChevronRight } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useApp } from '../lib/AppContext';
 import type { Task, SubTask } from '../lib/supabase';
+import { localDateKey, taskDeadlineDate } from '../lib/taskDates';
 
 type Props = {
   task: Task;
@@ -13,39 +14,16 @@ export function TaskDetailModal({ task, onClose }: Props) {
   const { refreshTasks } = useApp();
   const [subtasks, setSubtasks] = useState<SubTask[]>(task.subtasks || []);
   const [marking, setMarking] = useState(false);
-  const [countdown, setCountdown] = useState('');
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(task.title);
   const [editDesc, setEditDesc] = useState(task.description || '');
 
-  useEffect(() => {
-    if (!task.deadline) return;
-    const t = setInterval(() => {
-      const diff = new Date(task.deadline!).getTime() - Date.now();
-      if (diff <= 0) { setCountdown('Đã hết hạn'); return; }
-      const h = Math.floor(diff / 3600000);
-      const m = Math.floor((diff % 3600000) / 60000);
-      const s = Math.floor((diff % 60000) / 1000);
-      setCountdown(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
-    }, 1000);
-    return () => clearInterval(t);
-  }, [task.deadline]);
-
-  function getProgress() {
-    if (!task.deadline) return 0;
-    const created = new Date(task.created_at).getTime();
-    const deadline = new Date(task.deadline).getTime();
-    const now = Date.now();
-    return Math.min(100, Math.max(0, ((now - created) / (deadline - created)) * 100));
-  }
-
-  const progress = getProgress();
-  const isOverdue = task.deadline && new Date(task.deadline) < new Date() && task.status !== 'completed';
+  const deadlineDate = taskDeadlineDate(task.deadline);
+  const isOverdue = deadlineDate && deadlineDate < localDateKey() && task.status !== 'completed';
 
   function getStatusInfo() {
     if (task.status === 'completed') return { label: 'Hoàn thành', bg: '#e6f4ea', color: '#137333' };
     if (isOverdue) return { label: 'Quá hạn', bg: '#fce8e6', color: '#d93025' };
-    if (progress >= 70) return { label: 'Sắp hết hạn', bg: '#fff3e0', color: '#e65100' };
     return { label: 'Đang thực hiện', bg: '#e8f0fe', color: '#1967d2' };
   }
 
@@ -54,18 +32,6 @@ export function TaskDetailModal({ task, onClose }: Props) {
   const getCategoryLabel = (cat: string) => {
     const map: Record<string, string> = { study: 'Học tập', deadline: 'Deadline', group: 'Nhóm', personal: 'Cá nhân', other: 'Khác' };
     return map[cat] || cat;
-  };
-
-  const getRepeatLabel = (r: string) => {
-    const map: Record<string, string> = { none: 'Không lặp', daily: 'Hằng ngày', weekly: 'Hằng tuần', monthly: 'Hằng tháng' };
-    return map[r] || r;
-  };
-
-  const getRemindLabel = (mins: number) => {
-    if (mins === 60) return 'Trước 1 giờ';
-    if (mins === 30) return 'Trước 30 phút';
-    if (mins === 1440) return 'Trước 1 ngày';
-    return `Trước ${mins} phút`;
   };
 
   async function toggleComplete() {
@@ -139,43 +105,14 @@ export function TaskDetailModal({ task, onClose }: Props) {
             </h2>
           )}
 
-          {/* Countdown */}
-          {task.status !== 'completed' && countdown && (
-            <div className="rounded-2xl p-4 mb-4 text-center" style={{
-              background: isOverdue ? '#fce8e6' : progress >= 70 ? '#fff3e0' : 'linear-gradient(135deg, #0f2a1a 0%, #173325 100%)',
-            }}>
-              {isOverdue ? (
-                <div className="flex items-center justify-center gap-2">
-                  <AlertCircle size={16} style={{ color: '#d93025' }} />
-                  <span className="font-semibold" style={{ color: '#d93025' }}>Đã quá hạn</span>
-                </div>
-              ) : (
-                <>
-                  <p className="text-xs mb-1" style={{ color: progress >= 70 ? '#e65100' : 'rgba(255,255,255,0.6)' }}>Đếm ngược đến deadline</p>
-                  <p className="font-mono text-3xl font-bold" style={{ color: progress >= 70 ? '#e65100' : '#94d400', letterSpacing: '0.05em' }}>
-                    {countdown}
-                  </p>
-                  <div className="mt-3 h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.15)' }}>
-                    <div className="h-full rounded-full transition-all"
-                      style={{ width: `${progress}%`, background: progress >= 70 ? '#d93025' : '#94d400' }} />
-                  </div>
-                  <p className="text-xs mt-1" style={{ color: progress >= 70 ? '#e65100' : 'rgba(255,255,255,0.4)' }}>
-                    {Math.round(progress)}% thời gian đã trôi qua
-                  </p>
-                </>
-              )}
-            </div>
-          )}
-
           {/* Info grid */}
           <div className="rounded-2xl overflow-hidden mb-4" style={{ border: '1px solid #e8f0e8' }}>
             {[
-              { icon: <Clock size={14} />, label: 'Deadline', value: task.deadline ? new Date(task.deadline).toLocaleString('vi-VN') : 'Không có' },
-              { icon: <RepeatIcon size={14} />, label: 'Lặp lại', value: getRepeatLabel(task.repeat_type) },
-              { icon: <Bell size={14} />, label: 'Nhắc nhở', value: getRemindLabel(task.remind_before) },
-              { icon: <Tag size={14} />, label: 'Thời gian tạo', value: new Date(task.created_at).toLocaleString('vi-VN') },
+              { icon: <CalendarDays size={14} />, label: 'Deadline', value: deadlineDate ? new Date(`${deadlineDate}T00:00:00`).toLocaleDateString('vi-VN') : 'Không có' },
+              { icon: <Bell size={14} />, label: 'Nhắc nhở', value: task.reminder_enabled ? 'Đã bật' : 'Đã tắt' },
+              { icon: <Tag size={14} />, label: 'Thời gian tạo', value: new Date(task.created_at).toLocaleDateString('vi-VN') },
             ].map((row, i) => (
-              <div key={i} className="flex items-center gap-3 px-4 py-3" style={{ background: i % 2 === 0 ? '#f8fbf8' : '#fff', borderBottom: i < 3 ? '1px solid #f0f4f0' : 'none' }}>
+              <div key={i} className="flex items-center gap-3 px-4 py-3" style={{ background: i % 2 === 0 ? '#f8fbf8' : '#fff', borderBottom: i < 2 ? '1px solid #f0f4f0' : 'none' }}>
                 <div style={{ color: '#173325' }}>{row.icon}</div>
                 <span className="text-xs text-gray-500 w-24 flex-shrink-0">{row.label}</span>
                 <span className="text-xs font-medium text-right flex-1" style={{ color: '#202124' }}>{row.value}</span>

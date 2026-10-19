@@ -4,7 +4,7 @@ import {
   Bell,
   CheckCheck,
   ChevronLeft,
-  Clock3,
+  CalendarDays,
   Moon,
   Settings,
   Trash2,
@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../lib/AppContext';
 import { supabase } from '../lib/supabase';
+import { taskDeadlineDate } from '../lib/taskDates';
 import type { Meal, MealType, SleepLog, Task } from '../lib/supabase';
 import styles from './NotificationCenter.module.css';
 
@@ -143,7 +144,10 @@ function buildNotifications(
 
     tasks.forEach(task => {
       if (task.status === 'completed' || !task.deadline) return;
-      const deadline = new Date(task.deadline);
+      const deadlineKey = taskDeadlineDate(task.deadline);
+      if (!deadlineKey) return;
+      const [year, month, day] = deadlineKey.split('-').map(Number);
+      const deadline = new Date(year, month - 1, day, 23, 59, 59, 999);
       const remaining = deadline.getTime() - nowMs;
       if (remaining > leadMinutes * 60_000 || remaining < -24 * 60 * 60_000) return;
       const urgent = remaining <= 60 * 60_000;
@@ -152,8 +156,8 @@ function buildNotifications(
         category: 'task',
         title: urgent ? `Sắp đến hạn: ${task.title}` : `Nhắc deadline: ${task.title}`,
         body: remaining < 0
-          ? `Nhiệm vụ đã quá hạn từ ${deadline.toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })}. Cập nhật trạng thái để tiếp tục theo dõi.`
-          : `Hạn ${deadline.toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })}. Hoàn thành sớm để không bị trễ.`,
+          ? `Nhiệm vụ đã quá hạn từ ${deadline.toLocaleDateString('vi-VN')}. Cập nhật trạng thái để tiếp tục theo dõi.`
+          : `Hạn ${deadline.toLocaleDateString('vi-VN')}. Hoàn thành sớm để không bị trễ.`,
         createdAt: remaining > 0
           ? Math.min(nowMs, deadline.getTime() - leadMinutes * 60_000)
           : deadline.getTime(),
@@ -519,7 +523,7 @@ export function NotificationCenter() {
                           <div className={styles.meta}>
                             <span>{notificationTime(notification.createdAt, now)}</span>
                             {notification.task?.status !== 'completed' && notification.task?.deadline && (
-                              <span className={styles.deadlineChip}><Clock3 size={12} />{new Date(notification.task.deadline).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</span>
+                              <span className={styles.deadlineChip}><CalendarDays size={12} />{new Date(notification.task.deadline).toLocaleDateString('vi-VN')}</span>
                             )}
                           </div>
                           {notification.actions.length > 0 && (

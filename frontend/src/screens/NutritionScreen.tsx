@@ -826,6 +826,10 @@ export function NutritionScreen() {
                     placeholder="Tìm phở, cơm, rau..."
                   />
                 </label>
+                <div className={styles.foodListHeading}>
+                  <strong>{query.trim() ? 'KẾT QUẢ TÌM MÓN' : 'DANH SÁCH MÓN ĂN CÓ SẴN'}</strong>
+                  <span>{filteredFoods.length} món</span>
+                </div>
                 <div className={styles.foodList}>
                   {filteredFoods.map(food => {
                     const defaultPortion = food.portions[food.defaultPortion];
