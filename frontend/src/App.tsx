@@ -19,12 +19,22 @@ import { PremiumScreen } from './screens/PremiumScreen';
 import { TrackingScreen } from './screens/TrackingScreen';
 import { AIChatScreen } from './screens/AIChatScreen';
 import { BottomNav } from './components/BottomNav';
+import { recordLandingPageVisit } from './lib/landingAnalytics';
 
 const APP_SCREENS = ['dashboard', 'calendar', 'nutrition', 'sleep', 'profile'];
 
 function AppInner() {
   const { screen, isAdmin, setScreen } = useApp();
   const showNav = APP_SCREENS.includes(screen);
+
+  useEffect(() => {
+    void recordLandingPageVisit();
+  }, []);
+
+  useEffect(() => {
+    document.body.classList.toggle('admin-mode', screen === 'adminDashboard');
+    return () => document.body.classList.remove('admin-mode');
+  }, [screen]);
 
   useEffect(() => {
     if (screen === 'adminDashboard' && !isAdmin) setScreen('login');
@@ -56,8 +66,8 @@ function AppInner() {
   }
 
   return (
-    <div className="w-full h-[100dvh] flex flex-col bg-black">
-      <div className="flex-1 relative flex flex-col overflow-hidden w-full h-full">
+    <div className={`w-full flex flex-col ${screen === 'adminDashboard' ? 'min-h-screen bg-[#F5F7F5]' : 'h-[100dvh] bg-black'}`}>
+      <div className={`flex-1 relative flex flex-col w-full ${screen === 'adminDashboard' ? 'min-h-screen' : 'h-full overflow-hidden'}`}>
         {renderScreen()}
       </div>
       {showNav && (

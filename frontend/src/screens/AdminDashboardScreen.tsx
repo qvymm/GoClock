@@ -3,6 +3,7 @@ import {
   ArrowRight,
   Bell,
   CalendarDays,
+  CheckCircle2,
   CircleDot,
   CreditCard,
   Lock,
@@ -65,6 +66,8 @@ type SubscriptionRow = {
   paid_at: string | null;
   expiry: string | null;
 };
+
+type LandingSourceStats = { source: string; visits: number };
 
 const ADMIN_PAGE_SIZE = 25;
 
@@ -139,6 +142,61 @@ export function AdminDashboardScreen() {
   const [subscriptionPage, setSubscriptionPage] = useState(1);
   const [subscriptionSearch, setSubscriptionSearch] = useState('');
   const [selectedSubscription, setSelectedSubscription] = useState<SubscriptionRow | null>(null);
+  const [landingSources, setLandingSources] = useState<LandingSourceStats[]>([]);
+  const [landingVisits, setLandingVisits] = useState(0);
+  const [loadingLandingStats, setLoadingLandingStats] = useState(false);
+  const [landingStatsError, setLandingStatsError] = useState('');
+  const [ratingSummary, setRatingSummary] = useState({ count: 0, average: 0, distribution: {} as Record<string, number> });
+  const [ratingSummaryError, setRatingSummaryError] = useState('');
+
+  useEffect(() => {
+    if (activeSection !== 'analytics') return;
+    let current = true;
+    async function fetchLandingStats() {
+      setLoadingLandingStats(true);
+      setLandingStatsError('');
+      const { data, error } = await supabase.rpc('get_admin_landing_page_sources', { p_days: 30 });
+      if (!current) return;
+      if (error) {
+        console.error('Unable to load landing page source analytics:', error);
+        setLandingStatsError('Không tải được thống kê. Hãy chạy migration landing page analytics trên Supabase.');
+        setLandingSources([]);
+        setLandingVisits(0);
+      } else if (data && typeof data === 'object') {
+        const result = data as { totalVisits?: number; sources?: LandingSourceStats[] };
+        setLandingVisits(Number(result.totalVisits) || 0);
+        setLandingSources(Array.isArray(result.sources) ? result.sources : []);
+      }
+      setLoadingLandingStats(false);
+    }
+    void fetchLandingStats();
+    return () => { current = false; };
+  }, [activeSection]);
+
+  useEffect(() => {
+    if (activeSection !== 'analytics') return;
+    let current = true;
+    async function fetchRatingSummary() {
+      setRatingSummaryError('');
+      const { data, error } = await supabase.rpc('get_admin_app_rating_summary');
+      if (!current) return;
+      if (error) {
+        console.error('Unable to load app rating summary:', error);
+        setRatingSummaryError('Chưa tải được đánh giá. Hãy chạy migration đánh giá ứng dụng trên Supabase.');
+        return;
+      }
+      if (data && typeof data === 'object') {
+        const result = data as { count?: number; average?: number; distribution?: Record<string, number> };
+        setRatingSummary({
+          count: Number(result.count) || 0,
+          average: Number(result.average) || 0,
+          distribution: result.distribution ?? {},
+        });
+      }
+    }
+    void fetchRatingSummary();
+    return () => { current = false; };
+  }, [activeSection]);
 
   useEffect(() => {
     if (activeSection !== 'users') return;
@@ -272,6 +330,7 @@ export function AdminDashboardScreen() {
   };
 
   const selectedAnalytics = analyticsCardsState[analyticsTab];
+  const visibleLandingSources = landingSources.filter(({ source }) => source !== 'direct/unknown');
 
   function handleSendNotification(type: 'now' | 'schedule') {
     setNotificationStatus(`Thông báo đã ${type === 'now' ? 'gửi ngay' : 'lên lịch'} cho ${notification.target === 'all' ? 'tất cả người dùng' : notification.target === 'premium' ? 'Premium users' : 'Free users'}.`);
@@ -290,7 +349,7 @@ export function AdminDashboardScreen() {
                   {' '}Hãy chạy migration `20261014160000_add_admin_dashboard_stats_rpc.sql` trong đúng project Supabase.
                 </p>
               )}
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
                 <KpiCard label="Users" value={dashboardStats.totalUsers.toLocaleString('vi-VN')}
                   description="Total users registered" icon={User} iconClass="bg-sky-50 text-sky-600" />
                 <KpiCard label="Active" value={dashboardStats.activeUsersToday.toLocaleString('vi-VN')}
@@ -299,47 +358,49 @@ export function AdminDashboardScreen() {
                   description="Premium users" icon={Star} iconClass="bg-orange-50 text-orange-600" />
                 <KpiCard label="Revenue" value={`${dashboardStats.monthlyRevenue.toLocaleString('vi-VN')} VNĐ`}
                   description="Monthly recurring revenue" icon={Wallet} iconClass="bg-violet-50 text-violet-600" />
+                <KpiCard label="Successful Transactions" value={dashboardStats.successfulTransactions.toLocaleString('vi-VN')}
+                  description="Paid Premium orders" icon={CheckCircle2} iconClass="bg-emerald-50 text-emerald-600" />
               </div>
 
-              <div className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <ChartCard title="User Growth" description="Jan - Jun" icon={TrendingUp}>
-                    <div className="mt-5 h-64">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={userGrowth} margin={{ top: 10, right: 0, left: -10, bottom: 0 }}>
-                          <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
-                          <XAxis dataKey="month" tickLine={false} axisLine={false} />
-                          <YAxis domain={[0, 14000]} ticks={[0, 2000, 4000, 6000, 8000, 10000, 12000, 14000]}
-                            tickFormatter={(value) => `${value / 1000}k`} tickLine={false} axisLine={false} />
-                          <Tooltip formatter={(value: number) => value.toLocaleString()} />
-                          <Line type="monotone" dataKey="users" stroke="#2563eb" strokeWidth={3} dot={{ r: 4 }} />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </ChartCard>
+              <div className="grid grid-cols-1 gap-4">
+                <ChartCard title="User Growth" description="Jan - Jun" icon={TrendingUp}>
+                  <div className="mt-5 h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={userGrowth} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
+                        <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
+                        <XAxis dataKey="month" tickLine={false} axisLine={false} />
+                        <YAxis domain={[0, 'auto']} width={52} tick={{ fontSize: 11 }}
+                          tickFormatter={(value) => new Intl.NumberFormat('vi-VN', { notation: 'compact', maximumFractionDigits: 1 }).format(value)}
+                          tickLine={false} axisLine={false} />
+                        <Tooltip formatter={(value: number) => value.toLocaleString('vi-VN')} />
+                        <Line type="monotone" dataKey="users" stroke="#2563eb" strokeWidth={3} dot={{ r: 4 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </ChartCard>
 
-                  <ChartCard title="Revenue Trend" description="Jan - Jun" icon={CreditCard}>
-                    <div className="mt-5 h-64">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={revenueTrend} margin={{ top: 10, right: 0, left: -10, bottom: 0 }}>
-                          <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
-                          <XAxis dataKey="month" tickLine={false} axisLine={false} />
-                          <YAxis domain={[0, 60_000_000]} ticks={[0, 10_000_000, 20_000_000, 30_000_000, 40_000_000, 50_000_000, 60_000_000]}
-                            tickFormatter={(value) => `${value / 1_000_000}M`} tickLine={false} axisLine={false} />
-                          <Tooltip content={<RevenueTooltip />} />
-                          <Line type="monotone" dataKey="revenue" stroke="#16a34a" strokeWidth={3} dot={{ r: 4 }} />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </ChartCard>
-                </div>
+                <ChartCard title="Revenue Trend" description="Jan - Jun" icon={CreditCard}>
+                  <div className="mt-5 h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={revenueTrend} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
+                        <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
+                        <XAxis dataKey="month" tickLine={false} axisLine={false} />
+                        <YAxis domain={[0, 'auto']} width={58} tick={{ fontSize: 11 }}
+                          tickFormatter={(value) => new Intl.NumberFormat('vi-VN', { notation: 'compact', maximumFractionDigits: 1 }).format(value)}
+                          tickLine={false} axisLine={false} />
+                        <Tooltip content={<RevenueTooltip />} />
+                        <Line type="monotone" dataKey="revenue" stroke="#16a34a" strokeWidth={3} dot={{ r: 4 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </ChartCard>
 
                 <ChartCard title="Feature Usage" description="Task, Meal, Sleep" icon={CircleDot}>
-                  <div className="mt-5 flex flex-col items-center gap-4 md:flex-row md:items-end md:justify-between">
-                    <div className="h-56 w-full md:w-1/2">
+                  <div className="mt-5 flex flex-col items-center gap-4 md:flex-row md:items-center md:justify-between">
+                    <div className="h-72 w-full md:w-1/2">
                       <ResponsiveContainer width="100%" height="100%">
                         <RechartPieChart>
-                          <Pie data={featureUsageDataState} dataKey="value" nameKey="name" innerRadius={50} outerRadius={80} fill="#2563eb">
+                          <Pie data={featureUsageDataState} dataKey="value" nameKey="name" innerRadius={62} outerRadius={102} fill="#2563eb">
                             {featureUsageDataState.map((_, index) => (
                               <Cell key={`cell-${index}`} fill={featureColors[index]} />
                             ))}
@@ -347,7 +408,7 @@ export function AdminDashboardScreen() {
                         </RechartPieChart>
                       </ResponsiveContainer>
                     </div>
-                    <div className="grid gap-3 w-full md:w-1/2">
+                    <div className="grid w-full gap-3 md:w-1/2">
                       {featureUsageDataState.map((item, index) => (
                         <div key={item.name} className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
                           <div className="flex items-center justify-between gap-3">
@@ -572,6 +633,73 @@ export function AdminDashboardScreen() {
 
           {activeSection === 'analytics' && (
             <section className="space-y-6">
+              <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">Landing page · 30 ngày gần nhất</p>
+                    <h3 className="mt-2 text-xl font-semibold text-slate-900">Khách truy cập đến từ đâu?</h3>
+                  </div>
+                  <div className="rounded-2xl bg-emerald-50 px-5 py-3">
+                    <p className="text-xs font-medium text-emerald-800">Tổng lượt mở</p>
+                    <p className="mt-1 text-2xl font-bold text-emerald-950">{loadingLandingStats ? '…' : landingVisits.toLocaleString('vi-VN')}</p>
+                  </div>
+                </div>
+                {landingStatsError && <p role="alert" className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">{landingStatsError}</p>}
+                {!landingStatsError && !loadingLandingStats && visibleLandingSources.length === 0 && (
+                  <p className="mt-5 rounded-2xl bg-slate-50 px-4 py-5 text-sm text-slate-500">Chưa có lượt truy cập xác định được nguồn trong khoảng thời gian này.</p>
+                )}
+                {visibleLandingSources.length > 0 && (
+                  <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {visibleLandingSources.map(({ source, visits }) => {
+                      const labels: Record<string, string> = {
+                        facebook: 'Facebook', tiktok: 'TikTok', instagram: 'Instagram',
+                        zalo: 'Zalo', messenger: 'Messenger', other: 'Nguồn khác',
+                      };
+                      const percentage = landingVisits ? Math.round(visits * 100 / landingVisits) : 0;
+                      return <div key={source} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-sm font-semibold text-slate-800">{labels[source] ?? source}</span>
+                          <span className="text-sm font-bold text-slate-900">{visits.toLocaleString('vi-VN')}</span>
+                        </div>
+                        <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200">
+                          <div className="h-full rounded-full bg-emerald-600" style={{ width: `${percentage}%` }} />
+                        </div>
+                        <p className="mt-2 text-xs text-slate-500">{percentage}% tổng lượt mở</p>
+                      </div>;
+                    })}
+                  </div>
+                )}
+              </div>
+              <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+                <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+                  <div className="sm:min-w-52">
+                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-600">Phản hồi người dùng</p>
+                    <h3 className="mt-2 text-xl font-semibold text-slate-900">Đánh giá ứng dụng</h3>
+                    <p className="mt-1 text-sm text-slate-500">Tổng hợp đánh giá từ màn Trợ giúp</p>
+                  </div>
+                  <div className="flex items-center gap-3 rounded-2xl bg-amber-50 px-5 py-3">
+                    <Star size={28} fill="#f5b301" color="#f5b301" />
+                    <div>
+                      <p className="text-2xl font-bold text-slate-900">{ratingSummary.average.toFixed(1)} <span className="text-sm font-medium text-slate-500">/ 5</span></p>
+                      <p className="text-xs text-slate-600">{ratingSummary.count.toLocaleString('vi-VN')} lượt đánh giá</p>
+                    </div>
+                  </div>
+                  <div className="grid flex-1 gap-2">
+                    {[5, 4, 3, 2, 1].map(stars => {
+                      const count = Number(ratingSummary.distribution[String(stars)]) || 0;
+                      const percentage = ratingSummary.count ? Math.round(count * 100 / ratingSummary.count) : 0;
+                      return <div key={stars} className="flex items-center gap-2 text-xs text-slate-500">
+                        <span className="w-8 shrink-0">{stars} sao</span>
+                        <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
+                          <div className="h-full rounded-full bg-amber-400" style={{ width: `${percentage}%` }} />
+                        </div>
+                        <span className="w-8 text-right">{count}</span>
+                      </div>;
+                    })}
+                  </div>
+                </div>
+                {ratingSummaryError && <p role="alert" className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">{ratingSummaryError}</p>}
+              </div>
               <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                   <div>

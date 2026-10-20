@@ -6,6 +6,7 @@ export type AdminStats = {
   activeUsersToday: number;
   premiumUsers: number;
   monthlyRevenue: number;
+  successfulTransactions: number;
   totalTasks: number;
   totalMeals: number;
   totalSleepLogs: number;
@@ -20,6 +21,7 @@ export const MOCK_ADMIN_STATS: AdminStats = {
   activeUsersToday: 3_245,
   premiumUsers: 1_025,
   monthlyRevenue: 52_000_000,
+  successfulTransactions: 3_840,
   totalTasks: 24_850,
   totalMeals: 18_430,
   totalSleepLogs: 4_230,
@@ -93,8 +95,13 @@ export function useAdminStats() {
       }
 
       try {
-        const { data, error } = await supabase.rpc('get_admin_dashboard_stats');
+        const [dashboardResult, transactionResult] = await Promise.all([
+          supabase.rpc('get_admin_dashboard_stats'),
+          supabase.rpc('get_admin_successful_transaction_count'),
+        ]);
+        const { data, error } = dashboardResult;
         if (error) throw error;
+        if (transactionResult.error) throw transactionResult.error;
         if (!data || typeof data !== 'object') {
           throw new Error('RPC did not return dashboard statistics.');
         }
@@ -105,6 +112,7 @@ export function useAdminStats() {
           activeUsersToday: Number(payload.activeUsersToday) || 0,
           premiumUsers: Number(payload.premiumUsers) || 0,
           monthlyRevenue: Number(payload.monthlyRevenue) || 0,
+          successfulTransactions: Number(transactionResult.data) || 0,
           totalTasks: Number(payload.totalTasks) || 0,
           totalMeals: Number(payload.totalMeals) || 0,
           totalSleepLogs: Number(payload.totalSleepLogs) || 0,

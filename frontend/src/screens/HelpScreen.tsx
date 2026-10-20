@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useApp } from '../lib/AppContext';
-import { ArrowLeft, Search, MessageCircle, Mail, Phone, ChevronRight, ChevronDown, HelpCircle } from 'lucide-react';
+import { ArrowLeft, Search, MessageCircle, Mail, Phone, ChevronRight, ChevronDown, HelpCircle, Star } from 'lucide-react';
+import { isSupabaseEnabled, supabase } from '../lib/supabase';
 
 const faqs = [
   { q: 'Làm sao để thêm nhiệm vụ mới?', a: 'Vào màn hình Lịch, nhấn nút + ở góc dưới bên phải, điền thông tin nhiệm vụ và lưu.' },
@@ -11,9 +12,46 @@ const faqs = [
 ];
 
 export function HelpScreen() {
-  const { theme, setScreen } = useApp();
+  const { theme, setScreen, user } = useApp();
   const [search, setSearch] = useState('');
   const [expanded, setExpanded] = useState<number | null>(null);
+  const [rating, setRating] = useState(0);
+  const [review, setReview] = useState('');
+  const [savingRating, setSavingRating] = useState(false);
+  const [ratingMessage, setRatingMessage] = useState('');
+
+  useEffect(() => {
+    if (!user || !isSupabaseEnabled) return;
+    let active = true;
+    void supabase.from('app_ratings').select('rating, review').eq('user_id', user.id).maybeSingle()
+      .then(({ data, error }: any) => {
+        if (!active || error || !data) return;
+        setRating(Number(data.rating) || 0);
+        setReview(data.review || '');
+      });
+    return () => { active = false; };
+  }, [user?.id]);
+
+  async function submitRating() {
+    if (!user) {
+      setScreen('login');
+      return;
+    }
+    if (!rating) {
+      setRatingMessage('Vui lòng chọn số sao trước khi gửi.');
+      return;
+    }
+    setSavingRating(true);
+    setRatingMessage('');
+    const { error } = await supabase.from('app_ratings').upsert({
+      user_id: user.id,
+      rating,
+      review: review.trim() || null,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'user_id' });
+    setSavingRating(false);
+    setRatingMessage(error ? 'Chưa gửi được đánh giá. Vui lòng thử lại.' : 'Cảm ơn bạn đã đánh giá GoClock!');
+  }
 
   const filteredFaqs = faqs.filter(f => f.q.toLowerCase().includes(search.toLowerCase()) || f.a.toLowerCase().includes(search.toLowerCase()));
 
@@ -59,6 +97,30 @@ export function HelpScreen() {
             </div>
           ))}
         </div>
+
+        <section className="rounded-2xl p-4 mb-4" style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.05)' : '#fff', border: theme === 'dark' ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(23,51,37,0.08)' }}>
+          <h3 className="text-sm font-semibold" style={{ color: theme === 'dark' ? '#94d400' : '#173325' }}>Đánh giá GoClock</h3>
+          <p className="mt-1 text-xs" style={{ color: theme === 'dark' ? 'rgba(255,255,255,0.58)' : '#6b7280' }}>Trải nghiệm của bạn thế nào? Chọn số sao và để lại góp ý nếu muốn.</p>
+          <div className="mt-3 flex items-center gap-1" role="group" aria-label="Chọn số sao đánh giá">
+            {[1, 2, 3, 4, 5].map(value => (
+              <button key={value} type="button" onClick={() => setRating(value)} aria-label={`${value} sao`}
+                className="rounded-lg p-1.5 transition hover:scale-110 focus:outline-none focus:ring-2 focus:ring-lime-500">
+                <Star size={28} fill={value <= rating ? '#f5b301' : 'transparent'} color={value <= rating ? '#f5b301' : '#9ca3af'} />
+              </button>
+            ))}
+            {rating > 0 && <span className="ml-2 text-sm font-semibold" style={{ color: theme === 'dark' ? '#fff' : '#374151' }}>{rating}/5</span>}
+          </div>
+          <textarea value={review} onChange={event => setReview(event.target.value.slice(0, 500))}
+            placeholder="Góp ý của bạn (không bắt buộc)" rows={3} maxLength={500}
+            className="mt-3 w-full resize-none rounded-xl border px-3 py-2.5 text-sm outline-none focus:border-emerald-600"
+            style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.05)' : '#fff', borderColor: theme === 'dark' ? 'rgba(255,255,255,0.14)' : '#d1d5db', color: theme === 'dark' ? '#fff' : '#202124' }} />
+          <div className="mt-2 flex items-center justify-between gap-3">
+            <p aria-live="polite" className="text-xs" style={{ color: ratingMessage.startsWith('Cảm ơn') ? '#15803d' : '#dc2626' }}>{ratingMessage}</p>
+            <button type="button" disabled={savingRating} onClick={() => void submitRating()}
+              className="shrink-0 rounded-xl px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              style={{ background: '#173325' }}>{savingRating ? 'Đang gửi…' : user && rating ? 'Cập nhật đánh giá' : 'Gửi đánh giá'}</button>
+          </div>
+        </section>
 
         <div className="rounded-2xl p-4 mb-4" style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.05)' : '#fff', border: theme === 'dark' ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(23,51,37,0.08)' }}>
           <h3 className="text-sm font-semibold mb-3" style={{ color: theme === 'dark' ? '#94d400' : '#173325' }}>Liên hệ hỗ trợ</h3>

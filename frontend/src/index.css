@@ -26,6 +26,19 @@ body {
   align-items: center;
 }
 
+body.admin-mode {
+  display: block;
+  align-items: initial;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+body.admin-mode #root {
+  height: auto;
+  min-height: 100vh;
+  display: block;
+}
+
 /* Safe area padding utilities with fallback for desktop/simulators */
 .safe-pt {
   padding-top: max(env(safe-area-inset-top), 48px);
