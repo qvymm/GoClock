@@ -68,6 +68,8 @@ type SubscriptionRow = {
 };
 
 type LandingSourceStats = { source: string; visits: number };
+type RatingHistoryItem = { id: number; rating: number; review: string | null; recorded_at: string };
+type UserRatingHistory = { id: string; name: string; email: string; last_recorded_at: string; history: RatingHistoryItem[] };
 
 const ADMIN_PAGE_SIZE = 25;
 
@@ -148,6 +150,11 @@ export function AdminDashboardScreen() {
   const [landingStatsError, setLandingStatsError] = useState('');
   const [ratingSummary, setRatingSummary] = useState({ count: 0, average: 0, distribution: {} as Record<string, number> });
   const [ratingSummaryError, setRatingSummaryError] = useState('');
+  const [ratingHistory, setRatingHistory] = useState<UserRatingHistory[]>([]);
+  const [ratingHistorySearch, setRatingHistorySearch] = useState('');
+  const [ratingHistoryLoading, setRatingHistoryLoading] = useState(false);
+  const [ratingHistoryError, setRatingHistoryError] = useState('');
+  const [expandedRatingUsers, setExpandedRatingUsers] = useState<string[]>([]);
 
   useEffect(() => {
     if (activeSection !== 'analytics') return;
@@ -172,6 +179,26 @@ export function AdminDashboardScreen() {
     void fetchLandingStats();
     return () => { current = false; };
   }, [activeSection]);
+
+  useEffect(() => {
+    if (activeSection !== 'analytics') return;
+    let current = true;
+    setRatingHistoryLoading(true);
+    setRatingHistoryError('');
+    const timeout = window.setTimeout(async () => {
+      const { data, error } = await supabase.rpc('get_admin_app_rating_history', { p_search: ratingHistorySearch.trim() });
+      if (!current) return;
+      if (error) {
+        console.error('Unable to load app rating history:', error);
+        setRatingHistoryError('Chưa tải được lịch sử đánh giá. Hãy chạy migration lịch sử đánh giá trên Supabase.');
+        setRatingHistory([]);
+      } else {
+        setRatingHistory(Array.isArray(data) ? data as UserRatingHistory[] : []);
+      }
+      setRatingHistoryLoading(false);
+    }, 250);
+    return () => { current = false; window.clearTimeout(timeout); };
+  }, [activeSection, ratingHistorySearch]);
 
   useEffect(() => {
     if (activeSection !== 'analytics') return;
@@ -699,6 +726,42 @@ export function AdminDashboardScreen() {
                   </div>
                 </div>
                 {ratingSummaryError && <p role="alert" className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">{ratingSummaryError}</p>}
+              </div>
+              <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Theo từng tài khoản</p>
+                    <h3 className="mt-2 text-xl font-semibold text-slate-900">Lịch sử đánh giá cá nhân</h3>
+                    <p className="mt-1 text-sm text-slate-500">Xem các lần gửi hoặc cập nhật đánh giá được ghi nhận.</p>
+                  </div>
+                  <label className="relative block w-full sm:max-w-sm">
+                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input value={ratingHistorySearch} onChange={event => setRatingHistorySearch(event.target.value)}
+                      placeholder="Tìm tên hoặc email" className="w-full rounded-xl border border-slate-200 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-emerald-500" />
+                  </label>
+                </div>
+                {ratingHistoryError && <p role="alert" className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">{ratingHistoryError}</p>}
+                {ratingHistoryLoading ? <p className="mt-5 text-sm text-slate-500">Đang tải lịch sử đánh giá…</p>
+                  : !ratingHistoryError && ratingHistory.length === 0 ? <p className="mt-5 rounded-2xl bg-slate-50 px-4 py-5 text-sm text-slate-500">Chưa có đánh giá phù hợp.</p>
+                  : <div className="mt-5 divide-y divide-slate-100">
+                    {ratingHistory.map(person => {
+                      const expanded = expandedRatingUsers.includes(person.id);
+                      const latest = person.history[0];
+                      return <div key={person.id} className="py-3 first:pt-0 last:pb-0">
+                        <button type="button" onClick={() => setExpandedRatingUsers(current => expanded ? current.filter(id => id !== person.id) : [...current, person.id])}
+                          aria-expanded={expanded} className="flex w-full flex-col gap-2 text-left sm:flex-row sm:items-center sm:justify-between">
+                          <span className="min-w-0"><span className="block truncate text-sm font-semibold text-slate-900">{person.name}</span><span className="block truncate text-xs text-slate-500">{person.email}</span></span>
+                          <span className="flex shrink-0 items-center gap-3 text-xs text-slate-600"><span>{person.history.length} lần ghi nhận</span><span className="font-semibold text-amber-600">{latest?.rating ?? 0}/5 ★</span><span>{new Date(person.last_recorded_at).toLocaleDateString('vi-VN')}</span><span className="text-slate-400">{expanded ? 'Ẩn' : 'Xem lịch sử'}</span></span>
+                        </button>
+                        {expanded && <div className="mt-3 space-y-2 rounded-2xl bg-slate-50 p-3">
+                          {person.history.map(item => <div key={item.id} className="flex flex-col gap-1 text-sm sm:flex-row sm:items-start sm:justify-between">
+                            <div><span className="font-semibold text-amber-600">{'★'.repeat(item.rating)}{'☆'.repeat(5 - item.rating)}</span>{item.review && <p className="mt-1 whitespace-pre-wrap text-slate-700">{item.review}</p>}</div>
+                            <time className="shrink-0 text-xs text-slate-500">{new Date(item.recorded_at).toLocaleString('vi-VN')}</time>
+                          </div>)}
+                        </div>}
+                      </div>;
+                    })}
+                  </div>}
               </div>
               <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
